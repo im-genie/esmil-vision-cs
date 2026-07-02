@@ -824,6 +824,134 @@ function showPage(name,btn){
 </div>
 </div>
 
+<div id="pg-tasks" class="page">
+  <!-- 할일 등록 -->
+  <div class="card" style="padding:0;margin-bottom:16px">
+    <div class="cb">
+      <div style="display:flex;gap:10px">
+        <input id="task-input" type="text" placeholder="할 일 입력" style="flex:1;padding:10px;border:1px solid var(--bd);border-radius:var(--r);font-size:13px">
+        <button class="btn btn-p" onclick="addTask()" style="min-width:60px">등록</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 프로그레스 바 -->
+  <div class="card" style="padding:0;margin-bottom:16px">
+    <div class="cb">
+      <div style="font-size:12px;margin-bottom:8px">진행도: <span id="task-progress">0%</span> (<span id="task-done">0</span>/<span id="task-total">0</span>)</div>
+      <div style="background:var(--dm);border-radius:var(--r);height:8px;overflow:hidden">
+        <div id="task-bar" style="background:var(--gr);height:100%;width:0%;transition:width 0.3s"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 오늘의 할일 -->
+  <div class="card" style="padding:0;margin-bottom:16px">
+    <div class="ch">
+      <div class="ct">📋 오늘의 할일</div>
+    </div>
+    <div class="cb">
+      <div id="today-tasks-list" style="font-size:12px">할일이 없습니다</div>
+    </div>
+  </div>
+
+  <!-- 과거 할일 -->
+  <div class="card" style="padding:0;margin-bottom:16px">
+    <div class="ch" onclick="togglePastTasks()" style="cursor:pointer">
+      <div class="ct">📅 과거 할일</div>
+      <span id="past-toggle" style="float:right">▼</span>
+    </div>
+    <div class="cb">
+      <div id="past-tasks-list" style="display:none;font-size:12px"></div>
+    </div>
+  </div>
+
+  <!-- 파일 목록 -->
+  <div class="card" style="padding:0;margin-bottom:16px">
+    <div class="ch">
+      <div class="ct">📁 Vision Check List</div>
+    </div>
+    <div class="cb">
+      <div id="files-list" style="font-size:12px">파일이 없습니다</div>
+    </div>
+  </div>
+
+  <!-- 파일 업로드 -->
+  <div class="card" style="padding:0;margin-bottom:16px">
+    <div class="cb">
+      <div style="display:flex;gap:10px">
+        <input id="file-input" type="file" style="flex:1;padding:10px;border:1px solid var(--bd);border-radius:var(--r);font-size:13px">
+        <button class="btn btn-p" onclick="uploadFile()" style="min-width:60px">업로드</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Manual Page -->
+<div id="pg-manual" class="page">
+  <!-- 메뉴얼 업로드 -->
+  <div class="card" style="padding:0;margin-bottom:16px">
+    <div class="cb">
+      <div style="display:grid;grid-template-columns:1fr 1fr 60px;gap:10px">
+        <select id="manual-category" style="padding:10px;border:1px solid var(--bd);border-radius:var(--r);font-size:13px">
+          <option value="기타">기타</option>
+          <option value="작업 지침">작업 지침</option>
+          <option value="설치 가이드">설치 가이드</option>
+          <option value="유지보수">유지보수</option>
+          <option value="사용 설명서">사용 설명서</option>
+          <option value="신청서/양식">신청서/양식</option>
+        </select>
+        <input id="manual-input" type="file" style="padding:10px;border:1px solid var(--bd);border-radius:var(--r);font-size:13px">
+        <button class="btn btn-p" onclick="uploadManual()">업로드</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 메뉴얼 목록 -->
+  <div class="card" style="padding:0;margin-bottom:16px">
+    <div class="ch">
+      <div class="ct">📄 메뉴얼 목록</div>
+    </div>
+    <div class="cb">
+      <div id="manuals-list" style="font-size:12px">메뉴얼이 없습니다</div>
+    </div>
+  </div>
+</div>
+<!-- 파일 미리보기 모달 -->
+<div id="file-preview-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:1000;overflow:auto">
+  <div style="position:relative;margin:20px auto;max-width:90%;max-height:90%;background:var(--bg);border-radius:var(--r)">
+    <button onclick="closeFilePreview()" style="position:absolute;top:10px;right:10px;background:none;border:none;color:var(--mu);cursor:pointer;font-size:24px">✕</button>
+    <div id="file-preview-content" style="padding:20px;text-align:center"></div>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════════════════════
+// TASKS 관리
+// ════════════════════════════════════════════════════════════════════════
+
+var tasks = [];
+
+function getTodayRange() {
+  var now = new Date();
+  var today = new Date();
+  today.setHours(7, 0, 0, 0);
+  
+  if (now < today) {
+    today.setDate(today.getDate() - 1);
+  }
+  
+  var tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  
+  return { start: today, end: tomorrow };
+}
+
+function getDateString(d) {
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+async function loadTasks() {
 <!-- Edit Modal -->
 <div id="edit-modal" style="position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:8000;display:none;align-items:center;justify-content:center;padding:20px">
   <div style="background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);width:100%;max-width:680px;max-height:90vh;overflow-y:auto">
@@ -2427,134 +2555,6 @@ function toast(msg,isErr){var el=document.getElementById('toast');el.textContent
 
 </script>
 <!-- Tasks Page (할일 + 파일) -->
-<div id="pg-tasks" class="page">
-  <!-- 할일 등록 -->
-  <div class="card" style="padding:0;margin-bottom:16px">
-    <div class="cb">
-      <div style="display:flex;gap:10px">
-        <input id="task-input" type="text" placeholder="할 일 입력" style="flex:1;padding:10px;border:1px solid var(--bd);border-radius:var(--r);font-size:13px">
-        <button class="btn btn-p" onclick="addTask()" style="min-width:60px">등록</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- 프로그레스 바 -->
-  <div class="card" style="padding:0;margin-bottom:16px">
-    <div class="cb">
-      <div style="font-size:12px;margin-bottom:8px">진행도: <span id="task-progress">0%</span> (<span id="task-done">0</span>/<span id="task-total">0</span>)</div>
-      <div style="background:var(--dm);border-radius:var(--r);height:8px;overflow:hidden">
-        <div id="task-bar" style="background:var(--gr);height:100%;width:0%;transition:width 0.3s"></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 오늘의 할일 -->
-  <div class="card" style="padding:0;margin-bottom:16px">
-    <div class="ch">
-      <div class="ct">📋 오늘의 할일</div>
-    </div>
-    <div class="cb">
-      <div id="today-tasks-list" style="font-size:12px">할일이 없습니다</div>
-    </div>
-  </div>
-
-  <!-- 과거 할일 -->
-  <div class="card" style="padding:0;margin-bottom:16px">
-    <div class="ch" onclick="togglePastTasks()" style="cursor:pointer">
-      <div class="ct">📅 과거 할일</div>
-      <span id="past-toggle" style="float:right">▼</span>
-    </div>
-    <div class="cb">
-      <div id="past-tasks-list" style="display:none;font-size:12px"></div>
-    </div>
-  </div>
-
-  <!-- 파일 목록 -->
-  <div class="card" style="padding:0;margin-bottom:16px">
-    <div class="ch">
-      <div class="ct">📁 Vision Check List</div>
-    </div>
-    <div class="cb">
-      <div id="files-list" style="font-size:12px">파일이 없습니다</div>
-    </div>
-  </div>
-
-  <!-- 파일 업로드 -->
-  <div class="card" style="padding:0;margin-bottom:16px">
-    <div class="cb">
-      <div style="display:flex;gap:10px">
-        <input id="file-input" type="file" style="flex:1;padding:10px;border:1px solid var(--bd);border-radius:var(--r);font-size:13px">
-        <button class="btn btn-p" onclick="uploadFile()" style="min-width:60px">업로드</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Manual Page -->
-<div id="pg-manual" class="page">
-  <!-- 메뉴얼 업로드 -->
-  <div class="card" style="padding:0;margin-bottom:16px">
-    <div class="cb">
-      <div style="display:grid;grid-template-columns:1fr 1fr 60px;gap:10px">
-        <select id="manual-category" style="padding:10px;border:1px solid var(--bd);border-radius:var(--r);font-size:13px">
-          <option value="기타">기타</option>
-          <option value="작업 지침">작업 지침</option>
-          <option value="설치 가이드">설치 가이드</option>
-          <option value="유지보수">유지보수</option>
-          <option value="사용 설명서">사용 설명서</option>
-          <option value="신청서/양식">신청서/양식</option>
-        </select>
-        <input id="manual-input" type="file" style="padding:10px;border:1px solid var(--bd);border-radius:var(--r);font-size:13px">
-        <button class="btn btn-p" onclick="uploadManual()">업로드</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- 메뉴얼 목록 -->
-  <div class="card" style="padding:0;margin-bottom:16px">
-    <div class="ch">
-      <div class="ct">📄 메뉴얼 목록</div>
-    </div>
-    <div class="cb">
-      <div id="manuals-list" style="font-size:12px">메뉴얼이 없습니다</div>
-    </div>
-  </div>
-</div>
-<!-- 파일 미리보기 모달 -->
-<div id="file-preview-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:1000;overflow:auto">
-  <div style="position:relative;margin:20px auto;max-width:90%;max-height:90%;background:var(--bg);border-radius:var(--r)">
-    <button onclick="closeFilePreview()" style="position:absolute;top:10px;right:10px;background:none;border:none;color:var(--mu);cursor:pointer;font-size:24px">✕</button>
-    <div id="file-preview-content" style="padding:20px;text-align:center"></div>
-  </div>
-</div>
-
-<script>
-// ════════════════════════════════════════════════════════════════════════
-// TASKS 관리
-// ════════════════════════════════════════════════════════════════════════
-
-var tasks = [];
-
-function getTodayRange() {
-  var now = new Date();
-  var today = new Date();
-  today.setHours(7, 0, 0, 0);
-  
-  if (now < today) {
-    today.setDate(today.getDate() - 1);
-  }
-  
-  var tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  
-  return { start: today, end: tomorrow };
-}
-
-function getDateString(d) {
-  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
-}
-
-async function loadTasks() {
   var token = localStorage.getItem('ws_token') || '';
   try {
     var r = await fetch('/api/tasks', {
