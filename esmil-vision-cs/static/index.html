@@ -51,7 +51,7 @@ body{background:var(--bg);color:var(--tx);font-family:-apple-system,BlinkMacSyst
 .uinp::placeholder{color:var(--dm)}
 .bell-on{background:rgba(63,185,80,.18)!important;border:1px solid rgba(63,185,80,.55)!important;color:#3fb950!important}
 .main{max-width:2400px;margin:0 auto;padding:20px 28px;box-sizing:border-box;width:100%;min-width:0;overflow-x:clip}
-.page{display:none;animation:fi .2s ease}.page.active{display:block}
+.page{display:none;animation:fi .2s ease;padding:20px 28px}.page.active{display:block}
 @keyframes fi{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
 @keyframes spin{to{transform:rotate(360deg)}}
 .card{background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);margin-bottom:16px}
@@ -2425,8 +2425,8 @@ function toast(msg,isErr){var el=document.getElementById('toast');el.textContent
 <!-- Tasks Page (할일 + 파일) -->
 <div id="pg-tasks" class="page">
   <!-- 할일 등록 -->
-  <div class="card" style="padding:0;margin:20px 28px 16px 28px">
-    <div class="cb" style="padding:20px 28px">
+  <div class="card" style="padding:0;margin-bottom:16px">
+    <div class="cb">
       <div style="display:flex;gap:10px">
         <input id="task-input" type="text" placeholder="할 일 입력" style="flex:1;padding:10px;border:1px solid var(--bd);border-radius:var(--r);font-size:13px">
         <button class="btn btn-p" onclick="addTask()" style="min-width:60px">등록</button>
@@ -2436,7 +2436,7 @@ function toast(msg,isErr){var el=document.getElementById('toast');el.textContent
 
   <!-- 프로그레스 바 -->
   <div class="card" style="padding:0;margin-bottom:16px">
-    <div class="cb" style="padding:20px 28px">
+    <div class="cb">
       <div style="font-size:12px;margin-bottom:8px">진행도: <span id="task-progress">0%</span> (<span id="task-done">0</span>/<span id="task-total">0</span>)</div>
       <div style="background:var(--dm);border-radius:var(--r);height:8px;overflow:hidden">
         <div id="task-bar" style="background:var(--gr);height:100%;width:0%;transition:width 0.3s"></div>
@@ -2449,7 +2449,7 @@ function toast(msg,isErr){var el=document.getElementById('toast');el.textContent
     <div class="ch">
       <div class="ct">📋 오늘의 할일</div>
     </div>
-    <div class="cb" style="padding:20px 28px">
+    <div class="cb">
       <div id="today-tasks-list" style="font-size:12px">할일이 없습니다</div>
     </div>
   </div>
@@ -2460,7 +2460,7 @@ function toast(msg,isErr){var el=document.getElementById('toast');el.textContent
       <div class="ct">📅 과거 할일</div>
       <span id="past-toggle" style="float:right">▼</span>
     </div>
-    <div class="cb" style="padding:20px 28px">
+    <div class="cb">
       <div id="past-tasks-list" style="display:none;font-size:12px"></div>
     </div>
   </div>
@@ -2470,14 +2470,14 @@ function toast(msg,isErr){var el=document.getElementById('toast');el.textContent
     <div class="ch">
       <div class="ct">📁 Vision Check List</div>
     </div>
-    <div class="cb" style="padding:20px 28px">
+    <div class="cb">
       <div id="files-list" style="font-size:12px">파일이 없습니다</div>
     </div>
   </div>
 
   <!-- 파일 업로드 -->
   <div class="card" style="padding:0;margin-bottom:16px">
-    <div class="cb" style="padding:20px 28px">
+    <div class="cb">
       <div style="display:flex;gap:10px">
         <input id="file-input" type="file" style="flex:1;padding:10px;border:1px solid var(--bd);border-radius:var(--r);font-size:13px">
         <button class="btn btn-p" onclick="uploadFile()" style="min-width:60px">업로드</button>
@@ -2489,8 +2489,8 @@ function toast(msg,isErr){var el=document.getElementById('toast');el.textContent
 <!-- Manual Page -->
 <div id="pg-manual" class="page">
   <!-- 메뉴얼 업로드 -->
-  <div class="card" style="padding:0;margin:20px 28px 16px 28px">
-    <div class="cb" style="padding:20px 28px">
+  <div class="card" style="padding:0;margin-bottom:16px">
+    <div class="cb">
       <div style="display:grid;grid-template-columns:1fr 1fr 60px;gap:10px">
         <select id="manual-category" style="padding:10px;border:1px solid var(--bd);border-radius:var(--r);font-size:13px">
           <option value="기타">기타</option>
@@ -2511,7 +2511,7 @@ function toast(msg,isErr){var el=document.getElementById('toast');el.textContent
     <div class="ch">
       <div class="ct">📄 메뉴얼 목록</div>
     </div>
-    <div class="cb" style="padding:20px 28px">
+    <div class="cb">
       <div id="manuals-list" style="font-size:12px">메뉴얼이 없습니다</div>
     </div>
   </div>
