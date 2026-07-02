@@ -1,0 +1,159 @@
+<!-- ══════════════════════════════════════════════════════════════════════════════
+     추가 스타일 (index.html <style> 섹션에 추가)
+     ══════════════════════════════════════════════════════════════════════════════ -->
+
+/* Tasks & Manual 탭 스타일 */
+.task-card{background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);padding:14px 16px;margin-bottom:12px;display:flex;gap:12px;transition:all .2s}
+.task-card:hover{border-color:var(--bl);transform:translateY(-1px)}
+.task-priority{width:4px;border-radius:2px;flex-shrink:0}.task-priority.high{background:var(--rd)}.task-priority.normal{background:var(--bl)}.task-priority.low{background:var(--mu)}
+.task-body{flex:1;min-width:0}
+.task-title{font-weight:700;margin-bottom:5px;display:flex;align-items:center;gap:8px}
+.task-status{display:inline-block;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:700}
+.task-status.todo{background:rgba(248,81,73,.15);color:var(--rd)}.task-status.in_progress{background:rgba(56,139,253,.15);color:var(--bl)}.task-status.done{background:rgba(63,185,80,.15);color:var(--gn)}
+.task-desc{font-size:12px;color:var(--mu);margin-bottom:8px}
+.task-meta{display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:var(--dm)}
+.task-foot{display:flex;gap:6px;margin-top:8px}
+.task-edit-form{background:var(--s2);border:1px solid var(--bd);border-radius:var(--r);padding:14px 16px;margin-bottom:12px}
+.manual-item{background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);padding:14px 16px;margin-bottom:12px;display:flex;align-items:center;gap:12px;justify-content:space-between;transition:all .2s}
+.manual-item:hover{border-color:var(--bl);transform:translateY(-1px)}
+.manual-info{flex:1;min-width:0}
+.manual-title{font-weight:700;margin-bottom:4px}
+.manual-meta{display:flex;gap:8px;flex-wrap:wrap;font-size:11px;color:var(--dm)}
+.manual-actions{display:flex;gap:6px}
+.upload-area{border:2px dashed var(--bd);border-radius:var(--r);padding:28px;text-align:center;cursor:pointer;transition:all .2s}
+.upload-area:hover,.upload-area.drag{border-color:var(--bl);background:rgba(56,139,253,.05)}
+.upload-txt{color:var(--mu);font-size:13px}
+.upload-txt span{color:var(--bl);font-weight:600}
+.stat-filter-group{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
+.stat-filter-label{font-size:11px;font-weight:600;color:var(--mu);text-transform:uppercase;letter-spacing:.5px}
+
+<!-- ══════════════════════════════════════════════════════════════════════════════
+     네비게이션 탭 (헤더의 .hdr-center 안에 기존 탭들과 함께 추가)
+     ══════════════════════════════════════════════════════════════════════════════ -->
+
+<!-- 기존 탭들 (Log, Stats) 뒤에 추가 -->
+<button class="nav-btn" onclick="showPage('tasks')" id="nav-tasks">Tasks</button>
+<button class="nav-btn" onclick="showPage('manual')" id="nav-manual">Manual</button>
+
+<!-- ══════════════════════════════════════════════════════════════════════════════
+     Tasks 페이지 전체 (class="page"로 감싸진 새로운 섹션)
+     ══════════════════════════════════════════════════════════════════════════════ -->
+
+<div class="page" id="tasks-page">
+  <div class="main">
+    <div class="card">
+      <div class="ch">
+        <div class="ct">📋 팀 할일 목록</div>
+        <button class="btn btn-p btn-sm" onclick="showTaskForm()" id="new-task-btn">+ 새로운 작업</button>
+      </div>
+      <div class="cb">
+        <div id="task-form-container" style="display:none;margin-bottom:20px">
+          <div class="task-edit-form">
+            <div class="fg">
+              <div class="field">
+                <label class="fl">작업 제목 *</label>
+                <input type="text" id="task-title" placeholder="예: 이번주 점검 일정">
+              </div>
+              <div class="field">
+                <label class="fl">담당자</label>
+                <input type="text" id="task-assignee" placeholder="이름">
+              </div>
+              <div class="field">
+                <label class="fl">우선순위</label>
+                <select id="task-priority">
+                  <option value="low">낮음</option>
+                  <option value="normal" selected>보통</option>
+                  <option value="high">높음</option>
+                </select>
+              </div>
+              <div class="field">
+                <label class="fl">마감일</label>
+                <input type="date" id="task-duedate">
+              </div>
+            </div>
+            <div class="field" style="margin-top:12px">
+              <label class="fl">설명</label>
+              <textarea id="task-description" placeholder="추가 설명..."></textarea>
+            </div>
+            <div class="fa">
+              <button class="btn btn-g" onclick="cancelTaskForm()">취소</button>
+              <button class="btn btn-p" id="task-submit-btn" onclick="saveTask()">저장</button>
+            </div>
+          </div>
+        </div>
+        
+        <div id="tasks-list-container">
+          <!-- 작업 목록이 여기 렌더링됨 -->
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════════
+     Manual 페이지 전체
+     ══════════════════════════════════════════════════════════════════════════════ -->
+
+<div class="page" id="manual-page">
+  <div class="main">
+    <div class="card">
+      <div class="ch">
+        <div class="ct">📄 메뉴얼 & 문서</div>
+        <button class="btn btn-p btn-sm" onclick="showManualUpload()" id="upload-manual-btn">+ 메뉴얼 업로드</button>
+      </div>
+      <div class="cb">
+        <div id="manual-upload-container" style="display:none;margin-bottom:20px">
+          <div style="background:var(--s2);border:1px solid var(--bd);border-radius:var(--r);padding:14px 16px">
+            <div class="fg">
+              <div class="field">
+                <label class="fl">제목 *</label>
+                <input type="text" id="manual-title" placeholder="예: 검사 시스템 매뉴얼">
+              </div>
+              <div class="field">
+                <label class="fl">카테고리</label>
+                <select id="manual-category">
+                  <option value="기타">기타</option>
+                  <option value="점검">점검</option>
+                  <option value="장비">장비</option>
+                  <option value="안전">안전</option>
+                  <option value="프로세스">프로세스</option>
+                </select>
+              </div>
+            </div>
+            <div style="margin:14px 0">
+              <label class="fl" style="margin-bottom:8px;display:block">파일 선택 *</label>
+              <div class="upload-area" id="manual-drop-zone">
+                <input type="file" id="manual-file" style="display:none">
+                <div class="upload-txt">여기에 파일을 드래그 드롭하거나 <span>클릭</span>하여 선택</div>
+              </div>
+            </div>
+            <div class="fa">
+              <button class="btn btn-g" onclick="cancelManualUpload()">취소</button>
+              <button class="btn btn-p" id="manual-upload-submit-btn" onclick="uploadManual()">업로드</button>
+            </div>
+          </div>
+        </div>
+        
+        <div id="manuals-list-container">
+          <!-- 메뉴얼 목록이 여기 렌더링됨 -->
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════════
+     Stats 페이지의 필터 추가 (기존 Stats 페이지의 필터 섹션 아래에 추가)
+     ══════════════════════════════════════════════════════════════════════════════ -->
+
+<!-- .filters 섹션 아래에 추가 -->
+<div class="stat-filter-group" id="action-type-filter-group" style="display:none">
+  <div class="stat-filter-label">Action Type</div>
+  <select class="fsel" id="stat-action-filter" onchange="loadStatsData()">
+    <option value="">전체</option>
+    <option value="조치">조치</option>
+    <option value="대기">대기</option>
+    <option value="해제">해제</option>
+  </select>
+  <small style="color:var(--mu)">— 요청하신 값으로 커스터마이징 가능</small>
+</div>
