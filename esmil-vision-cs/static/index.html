@@ -64,6 +64,12 @@ body{background:var(--bg);color:var(--tx);font-family:-apple-system,BlinkMacSyst
 #pg-manual .card {
   padding: 0 !important;
 }
+
+/* Tasks/Manual의 .page padding은 제거 (자식 .card가 관리) */
+#pg-tasks,
+#pg-manual {
+  padding: 0 !important;
+}
 .sbar{display:flex;gap:10px;flex-wrap:wrap;padding:14px 20px;background:var(--s2);border-bottom:1px solid var(--bd)}
 .spill{background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);padding:10px 16px;text-align:center;min-width:90px}
 .snum{font-size:24px;font-weight:800;line-height:1}
