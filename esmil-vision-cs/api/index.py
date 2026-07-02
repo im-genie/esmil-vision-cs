@@ -698,7 +698,7 @@ async def health():
 
 @app.get("/")
 async def index():
-    p = os.path.join(static_folder, "index.html")
+    p = os.path.join(static_folder, "index_v2_tasks_manual.html")
     return FileResponse(p) if os.path.exists(p) else JSONResponse({"error": "Not found"}, status_code=404)
 
 @app.get("/{path:path}")
