@@ -1,12 +1,14 @@
 from fastapi import FastAPI, HTTPException, Depends, UploadFile, File, Form
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import JSONResponse, FileResponse, Response
+from urllib.parse import quote
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import firebase_admin
 from firebase_admin import credentials, firestore, storage as fb_storage
-import os, json
+import os, json, hashlib, hmac
 from datetime import datetime, timedelta, date
+from zoneinfo import ZoneInfo
 from typing import Optional
 from jose import jwt, JWTError
 import time
@@ -17,7 +19,24 @@ except ImportError:
     FCM_AVAILABLE = False
 
 # ── Config ────────────────────────────────────────────────────────────
-JWT_SECRET       = os.environ.get("JWT_SECRET", "esmil-vision-cs-2024")
+def _derive_jwt_secret() -> str:
+    """JWT 서명 키: 환경변수 우선, 없으면 Firebase 서비스 계정 키에서 파생.
+    코드(저장소)에 시크릿이 남지 않도록 하드코딩 폴백을 제거했다."""
+    env = os.environ.get("JWT_SECRET")
+    if env:
+        return env
+    cred_str = os.environ.get("FIREBASE_CREDENTIALS")
+    if not cred_str:
+        path = os.environ.get("FIREBASE_CREDENTIALS_PATH", "firebase-credentials.json")
+        if os.path.exists(path):
+            with open(path, "r", encoding="utf-8") as f:
+                cred_str = f.read()
+    if cred_str:
+        return hashlib.sha256(("esmil-jwt-v2|" + cred_str).encode()).hexdigest()
+    # 자격증명이 전혀 없는 환경(로컬 개발 등): 프로세스 수명 동안만 유효한 임의 키
+    return os.urandom(32).hex()
+
+JWT_SECRET       = _derive_jwt_secret()
 JWT_ALGO         = "HS256"
 JWT_EXPIRE_DAYS  = 30
 
@@ -30,12 +49,29 @@ static_folder = os.path.join(project_root, "static")
 # cs         → write, edit_today, edit_2days, upload_teamfiles
 # technician → write, edit_today, edit_2days, upload_teamfiles
 
-DEFAULT_ACCOUNTS = {
-    "esmil": {"password": "esmilvision1234!", "role": "admin",      "display": "ESMIL"},
-    "cs":    {"password": "1",                "role": "cs",         "display": "CS"},
-    "nsys":  {"password": "nsys",             "role": "cs",         "display": "NSYS"},
-    "tech":  {"password": "1",                "role": "technician", "display": "Technician"},
-}
+# 계정은 Firestore 'accounts' 컬렉션에서 관리한다 (비밀번호는 pbkdf2 해시 저장).
+# 보안상 하드코딩된 비밀번호는 제거됨 — Firestore를 읽을 수 없으면 로그인 불가.
+DEFAULT_ACCOUNTS = {}
+
+def hash_pw(pw: str) -> str:
+    """pbkdf2-sha256 해시 (표준 라이브러리만 사용)."""
+    salt = os.urandom(16)
+    dk = hashlib.pbkdf2_hmac("sha256", pw.encode(), salt, 200_000)
+    return f"pbkdf2$200000${salt.hex()}${dk.hex()}"
+
+def verify_pw(pw: str, stored: str) -> bool:
+    """해시(pbkdf2$...) 및 예전 평문 저장 계정 모두 검증."""
+    stored = str(stored or "")
+    if not pw or not stored:
+        return False
+    if stored.startswith("pbkdf2$"):
+        try:
+            _, iters, salt_hex, hash_hex = stored.split("$")
+            dk = hashlib.pbkdf2_hmac("sha256", pw.encode(), bytes.fromhex(salt_hex), int(iters))
+            return hmac.compare_digest(dk.hex(), hash_hex)
+        except Exception:
+            return False
+    return hmac.compare_digest(stored, pw)
 
 ROLE_PERMS = {
     "admin":      ["write", "edit_today", "edit_past", "delete", "manage_tasks", "manage_manual", "upload_teamfiles", "delete_teamfiles"],
@@ -99,7 +135,7 @@ def init_firebase():
                 raise Exception("Firebase credentials not found. Set FIREBASE_CREDENTIALS env var.")
             cred = credentials.Certificate(path)
         firebase_admin.initialize_app(cred, {
-            'storageBucket': 'esmil-vision-cs.appspot.com'
+            'storageBucket': 'esmil-vision-cs.firebasestorage.app'
         })
     db = firestore.client()
     bucket = fb_storage.bucket()
@@ -147,26 +183,57 @@ def days_ago(days: int) -> str:
     """Return date string from N days ago."""
     return (date.today() - timedelta(days=days)).isoformat()
 
+# ── 근무일(Work day): 08:00 → 다음날 08:00, 공장 현지시간(Michigan) 기준 ──
+try:
+    PLANT_TZ = ZoneInfo("America/Detroit")
+except Exception:  # tzdata 미설치 환경 대비 (고정 오프셋 폴백)
+    from datetime import timezone as _tz
+    PLANT_TZ = _tz(timedelta(hours=-5))
+OP_DAY_START_HOUR = 8
+
+def op_today() -> date:
+    """Current work day (8am boundary, plant local time)."""
+    now = datetime.now(PLANT_TZ) - timedelta(hours=OP_DAY_START_HOUR)
+    return now.date()
+
 def can_edit_entry(username: str, entry_date: str) -> bool:
-    """Check if user can edit an entry based on date and role."""
+    """Admin: any entry. cs/technician: entries from the current or previous work day."""
     role = accounts_map().get(username, {}).get("role", "")
-    today = date.today().isoformat()
-    
+    perms = ROLE_PERMS.get(role, [])
+
     # admin can always edit
-    if "edit_past" in ROLE_PERMS.get(role, []):
+    if "edit_past" in perms:
         return True
-    
-    # cs/technician can edit today and yesterday (edit_2days)
-    if entry_date == today or entry_date == days_ago(1):
-        return "edit_2days" in ROLE_PERMS.get(role, []) or "edit_today" in ROLE_PERMS.get(role, [])
-    
-    return False
+
+    if "edit_2days" not in perms and "edit_today" not in perms:
+        return False
+
+    cutoff = (op_today() - timedelta(days=1)).isoformat()
+    return bool(entry_date) and entry_date >= cutoff
 
 def serialize(obj):
     if isinstance(obj, dict):  return {k: serialize(v) for k, v in obj.items()}
     if isinstance(obj, list):  return [serialize(i) for i in obj]
     if hasattr(obj, "isoformat"): return obj.isoformat()
     return obj
+
+# ── 감사 로그 & 관리자 확인 ──────────────────────────────────────────
+AUDIT_RETENTION_DAYS = 7
+
+def audit_log(actor: str, action: str, target: str = "", detail: str = ""):
+    """감사 로그 기록. 실패해도 본 동작에는 영향 주지 않는다."""
+    try:
+        ensure_db()
+        db.collection("audit").add({
+            "user": actor, "action": action, "target": target, "detail": detail,
+            "at": firestore.SERVER_TIMESTAMP,
+        })
+    except Exception as e:
+        print(f"[audit] skip: {e}")
+
+def require_admin(username: str):
+    if accounts_map().get(username, {}).get("role") != "admin":
+        raise HTTPException(403, "Admin only")
 
 # ════════════════════════════════════════════════════════════════════════
 # AUTH
@@ -177,7 +244,8 @@ async def login(payload: dict):
     u = payload.get("username", "").strip().lower()
     p = payload.get("password", "").strip()
     accts = accounts_map()
-    if u not in accts or accts[u]["password"] != p:
+    if u not in accts or not verify_pw(p, accts[u]["password"]):
+        audit_log(u or "?", "login_fail")
         raise HTTPException(401, "Invalid username or password")
     acc = accts[u]
     return JSONResponse({
@@ -199,6 +267,88 @@ async def me(u: str = Depends(current_user)):
         "role":        acc["role"],
         "permissions": ROLE_PERMS.get(acc["role"], []),
     })
+
+# ════════════════════════════════════════════════════════════════════════
+# ADMIN: 계정 관리 & 감사 로그 (esmil 전용)
+# ════════════════════════════════════════════════════════════════════════
+
+@app.get("/api/accounts")
+async def list_accounts(u: str = Depends(current_user)):
+    require_admin(u)
+    out = [{"username": name, "role": a.get("role"), "display": a.get("display")}
+           for name, a in sorted(accounts_map().items())]
+    return JSONResponse({"accounts": out})
+
+@app.post("/api/accounts")
+async def upsert_account(payload: dict, u: str = Depends(current_user)):
+    require_admin(u)
+    ensure_db()
+    username = str(payload.get("username", "")).strip().lower()
+    if not username or not username.isalnum():
+        raise HTTPException(400, "Invalid username (letters/numbers only)")
+    role = payload.get("role", "cs")
+    if role not in ROLE_PERMS:
+        raise HTTPException(400, "Invalid role")
+    display = str(payload.get("display", "")).strip() or username.upper()
+    password = str(payload.get("password", ""))
+
+    ref = db.collection("accounts").document(username)
+    existing = ref.get()
+    if not existing.exists and not password:
+        raise HTTPException(400, "Password required for new account")
+
+    # 마지막 admin 강등 방지
+    if existing.exists and (existing.to_dict() or {}).get("role") == "admin" and role != "admin":
+        admins = [n for n, a in accounts_map().items() if a.get("role") == "admin"]
+        if admins == [username]:
+            raise HTTPException(400, "Cannot demote the last admin account")
+
+    data = {"role": role, "display": display}
+    if password:
+        data["password"] = hash_pw(password)
+    ref.set(data, merge=True)
+    _acct_cache["data"] = None  # 캐시 즉시 무효화
+    audit_log(u, "account_update" if existing.exists else "account_create", username,
+              f"role={role}" + (" (비밀번호 변경)" if password and existing.exists else ""))
+    return JSONResponse({"success": True})
+
+@app.delete("/api/accounts/{username}")
+async def delete_account(username: str, u: str = Depends(current_user)):
+    require_admin(u)
+    ensure_db()
+    username = username.strip().lower()
+    if username == u:
+        raise HTTPException(400, "Cannot delete your own account")
+    tgt = accounts_map().get(username)
+    if not tgt:
+        raise HTTPException(404, "Account not found")
+    if tgt.get("role") == "admin":
+        admins = [n for n, a in accounts_map().items() if a.get("role") == "admin"]
+        if len(admins) <= 1:
+            raise HTTPException(400, "Cannot delete the last admin account")
+    db.collection("accounts").document(username).delete()
+    _acct_cache["data"] = None
+    audit_log(u, "account_delete", username)
+    return JSONResponse({"success": True})
+
+@app.get("/api/audit")
+async def get_audit(limit: int = 300, u: str = Depends(current_user)):
+    require_admin(u)
+    ensure_db()
+    try:
+        # 90일 지난 로그 지연 삭제
+        try:
+            cutoff = datetime.now(PLANT_TZ) - timedelta(days=AUDIT_RETENTION_DAYS)
+            for d in db.collection("audit").where("at", "<", cutoff).stream():
+                d.reference.delete()
+        except Exception as pe:
+            print(f"[audit] purge skip: {pe}")
+        docs = db.collection("audit").order_by(
+            "at", direction=firestore.Query.DESCENDING).limit(max(1, min(int(limit), 1000))).stream()
+        logs = [serialize({**(d.to_dict() or {}), "id": d.id}) for d in docs]
+        return JSONResponse({"logs": logs})
+    except Exception as ex:
+        raise HTTPException(500, str(ex))
 
 # ════════════════════════════════════════════════════════════════════════
 # ENTRIES
@@ -278,7 +428,8 @@ async def create_entry(payload: dict, u: str = Depends(current_user)):
         await send_push_to_roles(title, body, {"entryId": ref.id})
     except Exception as e:
         print(f"[FCM] push send failed: {e}")
-    
+
+    audit_log(u, "entry_create", ref.id, f"{entry.get('date','')} {proc_short}{ca_short}#{line} {action}")
     return JSONResponse({"id": ref.id, "success": True})
 
 @app.put("/api/entries/{entry_id}")
@@ -291,33 +442,57 @@ async def update_entry(entry_id: str, payload: dict, u: str = Depends(current_us
     
     # Check if user can edit this entry
     if not can_edit_entry(u, entry_date):
-        raise HTTPException(403, "You can only edit entries from today or yesterday")
+        raise HTTPException(403, "You can only edit entries from the current or previous work day (8am-8am)")
     
     data = {k: v for k, v in payload.items() if k != "id"}
     data.update({"updatedBy": u, "updatedAt": firestore.SERVER_TIMESTAMP})
     db.collection("entries").document(entry_id).update(data)
+    audit_log(u, "entry_edit", entry_id, entry_date)
     return JSONResponse({"success": True})
 
 @app.delete("/api/entries/{entry_id}")
 async def delete_entry(entry_id: str, u: str = Depends(current_user)):
-    require(u, "delete")
+    """Admin: any entry. cs/technician: only entries within the current/previous work day."""
     ensure_db()
+    doc = db.collection("entries").document(entry_id).get()
+    if not doc.exists:
+        raise HTTPException(404, "Entry not found")
+    e = doc.to_dict() or {}
+    role = accounts_map().get(u, {}).get("role", "")
+    if "delete" not in ROLE_PERMS.get(role, []):
+        if not can_edit_entry(u, e.get("date", "")):
+            raise HTTPException(403, "You can only delete entries from the current or previous work day (8am-8am)")
     db.collection("entries").document(entry_id).delete()
+    audit_log(u, "entry_delete", entry_id,
+              f"{e.get('date','')} {e.get('proc','')} {e.get('vision','')} {e.get('action','')}")
     return JSONResponse({"success": True})
 
 # ════════════════════════════════════════════════════════════════════════
 # TASKS
 # ════════════════════════════════════════════════════════════════════════
 
+TASK_RETENTION_DAYS = 30  # 과거 할일 보관 기간 (지나면 영구 삭제)
+
 @app.get("/api/tasks")
 async def get_tasks(u: str = Depends(current_user)):
-    """Get all tasks for the team."""
+    """Get all tasks for the team. Tasks older than TASK_RETENTION_DAYS are purged."""
     ensure_db()
     try:
+        cutoff = (date.today() - timedelta(days=TASK_RETENTION_DAYS)).isoformat()
         docs = list(db.collection("tasks").order_by("createdAt", direction=firestore.Query.DESCENDING).stream())
         tasks = []
         for d in docs:
-            tasks.append(serialize({**d.to_dict(), "id": d.id}))
+            t = d.to_dict() or {}
+            # createdDate 없는 예전 데이터는 createdAt으로 보정
+            cd = t.get("createdDate")
+            if not cd:
+                ts = t.get("createdAt")
+                cd = ts.date().isoformat() if hasattr(ts, "date") else date.today().isoformat()
+                t["createdDate"] = cd
+            if cd < cutoff:
+                d.reference.delete()
+                continue
+            tasks.append(serialize({**t, "id": d.id}))
         return JSONResponse({"tasks": tasks})
     except Exception as ex:
         raise HTTPException(500, str(ex))
@@ -334,27 +509,69 @@ async def create_task(payload: dict, u: str = Depends(current_user)):
         "priority": payload.get("priority", "normal"),  # low, normal, high
         "status": payload.get("status", "todo"),  # todo, in_progress, done
         "dueDate": payload.get("dueDate", ""),
+        "completed": bool(payload.get("completed", False)),
+        "createdDate": payload.get("createdDate") or date.today().isoformat(),
         "createdBy": u,
         "createdAt": firestore.SERVER_TIMESTAMP,
         "updatedAt": firestore.SERVER_TIMESTAMP,
     }
     ref = db.collection("tasks").document()
     ref.set(task)
+    # 새 할일 등록 알림 → 현장 계정(technician/cs)으로 푸시
+    await send_push_to_roles(
+        "📋 새 할일",
+        f"'{task['title']}' 할일이 등록되었습니다.",
+        {"type": "task_created", "taskId": ref.id},
+        roles={"technician", "cs"},
+    )
+    audit_log(u, "task_create", ref.id, task["title"])
     return JSONResponse({"id": ref.id, "success": True})
 
 @app.put("/api/tasks/{task_id}")
 async def update_task(task_id: str, payload: dict, u: str = Depends(current_user)):
-    """Update a task (admin only)."""
-    require(u, "manage_tasks")
+    """Update a task. Admins can edit everything; cs/technician can only check/uncheck (completed)."""
     ensure_db()
+    acct = accounts_map().get(u, {})
+    role = acct.get("role", "")
+    is_admin = "manage_tasks" in ROLE_PERMS.get(role, [])
+
+    data = {k: v for k, v in payload.items() if k != "id"}
+    if not is_admin:
+        # Non-admins may only toggle completion
+        if not data or set(data.keys()) - {"completed"}:
+            raise HTTPException(403, "Only task completion can be changed by your account")
+
     doc = db.collection("tasks").document(task_id).get()
     if not doc.exists:
         raise HTTPException(404, "Task not found")
-    
-    data = {k: v for k, v in payload.items() if k != "id"}
+
+    # 체크/해제 시 누가 언제 완료했는지 기록
+    if "completed" in data:
+        if data["completed"]:
+            data["completedBy"] = acct.get("display", u)
+            data["completedAt"] = datetime.utcnow().isoformat() + "Z"
+        else:
+            data["completedBy"] = firestore.DELETE_FIELD
+            data["completedAt"] = firestore.DELETE_FIELD
+
     data["updatedBy"] = u
     data["updatedAt"] = firestore.SERVER_TIMESTAMP
     db.collection("tasks").document(task_id).update(data)
+
+    # Alarm admins (esmil) whenever a non-admin checks off a to-do
+    task_title = (doc.to_dict() or {}).get("title", "")
+    if data.get("completed") is True and not is_admin:
+        display = acct.get("display", u)
+        await send_push_to_roles(
+            "✅ 할일 완료",
+            f"{display}님이 '{task_title}' 항목을 완료했습니다.",
+            {"type": "task_completed", "taskId": task_id},
+            roles={"admin"},
+        )
+    if "title" in data:
+        audit_log(u, "task_edit", task_id, str(data.get("title", "")))
+    elif "completed" in data:
+        audit_log(u, "task_check" if data["completed"] else "task_uncheck", task_id, task_title)
     return JSONResponse({"success": True})
 
 @app.delete("/api/tasks/{task_id}")
@@ -362,7 +579,10 @@ async def delete_task(task_id: str, u: str = Depends(current_user)):
     """Delete a task (admin only)."""
     require(u, "manage_tasks")
     ensure_db()
+    doc = db.collection("tasks").document(task_id).get()
+    title = (doc.to_dict() or {}).get("title", "") if doc.exists else ""
     db.collection("tasks").document(task_id).delete()
+    audit_log(u, "task_delete", task_id, title)
     return JSONResponse({"success": True})
 
 # ════════════════════════════════════════════════════════════════════════
@@ -413,7 +633,8 @@ async def upload_team_file(
         }
         ref = db.collection("team_files").document()
         ref.set(team_file)
-        
+
+        audit_log(u, "teamfile_upload", ref.id, file.filename)
         return JSONResponse({
             "id": ref.id,
             "success": True,
@@ -443,13 +664,39 @@ async def download_team_file(file_id: str, u: str = Depends(current_user)):
             raise HTTPException(404, "File not found in storage")
         
         file_data = blob.download_as_bytes()
-        return FileResponse(
-            path=file_data,
-            filename=team_file.get("originalFileName", "download"),
-            media_type=blob.content_type
+        # originalFileName이 확장자가 포함된 원본명 (fileName은 표시용 제목)
+        fname = team_file.get("originalFileName") or team_file.get("fileName") or "download"
+        return Response(
+            content=file_data,
+            media_type=blob.content_type or "application/octet-stream",
+            headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(fname)}"},
         )
+    except HTTPException:
+        raise
     except Exception as ex:
         raise HTTPException(500, str(ex))
+
+def _signed_preview_url(blob) -> str:
+    """Microsoft Office 뷰어가 파일을 읽을 수 있도록 15분짜리 서명 URL 발급."""
+    return blob.generate_signed_url(version="v4", expiration=timedelta(minutes=15), method="GET")
+
+@app.get("/api/team-files/{file_id}/preview-url")
+async def team_file_preview_url(file_id: str, u: str = Depends(current_user)):
+    """Office 문서 미리보기용 임시 서명 URL (로그인 필요)."""
+    ensure_db()
+    doc = db.collection("team_files").document(file_id).get()
+    if not doc.exists:
+        raise HTTPException(404, "File not found")
+    fp = (doc.to_dict() or {}).get("filePath", "")
+    if not fp:
+        raise HTTPException(404, "File not found")
+    blob = bucket.blob(fp)
+    if not blob.exists():
+        raise HTTPException(404, "File not found in storage")
+    try:
+        return JSONResponse({"url": _signed_preview_url(blob)})
+    except Exception as ex:
+        raise HTTPException(500, f"Signed URL failed: {ex}")
 
 @app.delete("/api/team-files/{file_id}")
 async def delete_team_file(file_id: str, u: str = Depends(current_user)):
@@ -473,6 +720,7 @@ async def delete_team_file(file_id: str, u: str = Depends(current_user)):
     
     # Delete from Firestore
     db.collection("team_files").document(file_id).delete()
+    audit_log(u, "teamfile_delete", file_id, team_file.get("fileName", ""))
     return JSONResponse({"success": True})
 
 # ════════════════════════════════════════════════════════════════════════
@@ -499,10 +747,10 @@ async def upload_manual(
     file: UploadFile = File(...),
     title: str = Form(""),
     category: str = Form(""),
+    subcategory: str = Form(""),
     u: str = Depends(current_user)
 ):
-    """Upload a manual document."""
-    require(u, "manage_manual")
+    """Upload a manual document. All logged-in roles can upload; only admin can delete."""
     ensure_db()
     
     try:
@@ -515,6 +763,7 @@ async def upload_manual(
         manual = {
             "title": title or file.filename,
             "category": category or "기타",
+            "subcategory": subcategory,
             "fileName": file.filename,
             "filePath": blob_path,
             "fileSize": blob.size,
@@ -523,7 +772,8 @@ async def upload_manual(
         }
         ref = db.collection("manuals").document()
         ref.set(manual)
-        
+
+        audit_log(u, "manual_upload", ref.id, f"{category}/{subcategory} · {file.filename}")
         return JSONResponse({
             "id": ref.id,
             "success": True,
@@ -553,13 +803,34 @@ async def download_manual(manual_id: str, u: str = Depends(current_user)):
             raise HTTPException(404, "File not found in storage")
         
         file_data = blob.download_as_bytes()
-        return FileResponse(
-            path=file_data,
-            filename=manual.get("fileName", "download"),
-            media_type=blob.content_type
+        fname = manual.get("fileName") or "download"
+        return Response(
+            content=file_data,
+            media_type=blob.content_type or "application/octet-stream",
+            headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(fname)}"},
         )
+    except HTTPException:
+        raise
     except Exception as ex:
         raise HTTPException(500, str(ex))
+
+@app.get("/api/manuals/{manual_id}/preview-url")
+async def manual_preview_url(manual_id: str, u: str = Depends(current_user)):
+    """Office 문서 미리보기용 임시 서명 URL (로그인 필요)."""
+    ensure_db()
+    doc = db.collection("manuals").document(manual_id).get()
+    if not doc.exists:
+        raise HTTPException(404, "Manual not found")
+    fp = (doc.to_dict() or {}).get("filePath", "")
+    if not fp:
+        raise HTTPException(404, "File not found")
+    blob = bucket.blob(fp)
+    if not blob.exists():
+        raise HTTPException(404, "File not found in storage")
+    try:
+        return JSONResponse({"url": _signed_preview_url(blob)})
+    except Exception as ex:
+        raise HTTPException(500, f"Signed URL failed: {ex}")
 
 @app.delete("/api/manuals/{manual_id}")
 async def delete_manual(manual_id: str, u: str = Depends(current_user)):
@@ -583,6 +854,7 @@ async def delete_manual(manual_id: str, u: str = Depends(current_user)):
     
     # Delete from Firestore
     db.collection("manuals").document(manual_id).delete()
+    audit_log(u, "manual_delete", manual_id, manual.get("title", ""))
     return JSONResponse({"success": True})
 
 # ════════════════════════════════════════════════════════════════════════
@@ -591,18 +863,19 @@ async def delete_manual(manual_id: str, u: str = Depends(current_user)):
 
 NOTIFY_ROLES = {"admin", "technician"}
 
-async def send_push_to_roles(title: str, body: str, data: dict = None):
-    """Send push notification to all registered tokens for NOTIFY_ROLES."""
+async def send_push_to_roles(title: str, body: str, data: dict = None, roles: set = None):
+    """Send push notification to all registered tokens for the given roles (default NOTIFY_ROLES)."""
     if not FCM_AVAILABLE:
         return
     ensure_db()
+    target_roles = roles or NOTIFY_ROLES
     try:
         pairs = []
         seen = set()
         for doc in db.collection("fcm_tokens").stream():
             d = doc.to_dict() or {}
             tok = d.get("token")
-            if d.get("role") in NOTIFY_ROLES and tok and tok not in seen:
+            if d.get("role") in target_roles and tok and tok not in seen:
                 seen.add(tok)
                 pairs.append((doc.id, tok))
         if not pairs:

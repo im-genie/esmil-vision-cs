@@ -59,7 +59,39 @@ body{background:var(--bg);color:var(--tx);font-family:-apple-system,BlinkMacSyst
 .ct{font-size:11.5px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--mu);display:flex;align-items:center;gap:8px}
 .cb{padding:18px 20px}
 
-/* Tasks와 Manual에서는 .card padding 제거 (.page가 관리함) */
+/* ── Tasks & Manual ── */
+.task-row{display:flex;align-items:center;gap:11px;padding:10px 2px;border-bottom:1px solid var(--b2);transition:background .15s}
+.task-row:last-child{border-bottom:none}
+.task-row:hover{background:rgba(255,255,255,.025)}
+.tchk{width:19px;height:19px;border-radius:50%;border:2px solid var(--dm);flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;transition:all .15s;user-select:none}
+.tchk:hover{border-color:var(--gn);box-shadow:0 0 0 3px rgba(63,185,80,.15)}
+.tchk.on{background:var(--gn);border-color:var(--gn)}
+.task-txt{flex:1;min-width:0;font-size:13px;cursor:pointer;overflow-wrap:anywhere}
+.task-txt.done{color:var(--dm);text-decoration:line-through}
+.task-meta{font-size:10.5px;color:var(--gn);margin-left:8px;white-space:nowrap;text-decoration:none;display:inline-block}
+.task-date{font-size:10.5px;font-weight:700;letter-spacing:.8px;color:var(--dm);text-transform:uppercase;margin:14px 0 4px;display:flex;align-items:center;gap:8px}
+.task-date::after{content:'';flex:1;height:1px;background:var(--b2)}
+.file-row{display:flex;align-items:center;gap:11px;padding:9px 2px;border-bottom:1px solid var(--b2);transition:background .15s}
+.file-row:last-child{border-bottom:none}
+.file-row:hover{background:rgba(255,255,255,.025)}
+.file-ic{width:36px;height:36px;border-radius:9px;background:var(--s2);border:1px solid var(--bd);display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0}
+.file-nm{flex:1;min-width:0}
+.file-nm b{display:block;font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.file-meta{font-size:11px;color:var(--dm);margin-top:2px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.file-acts{display:flex;gap:6px;flex-shrink:0}
+.fpick{display:flex;align-items:center;gap:9px;flex:1;min-width:160px;background:var(--s2);border:1px dashed var(--bd);border-radius:var(--rs);padding:8px 13px;cursor:pointer;transition:all .15s;position:relative;overflow:hidden}
+.fpick:hover,.fpick.drag{border-color:var(--bl);background:rgba(56,139,253,.05)}
+.fpick.has-file{border-style:solid;border-color:var(--gn)}
+.fpick input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.fpick-txt{font-size:12.5px;color:var(--mu);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;pointer-events:none}
+.fpick-txt b{color:var(--bl);font-weight:600}
+.fpick.has-file .fpick-txt{color:var(--tx)}
+.mcat-hdr{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;margin:16px 0 6px}
+.mcat-hdr:first-child{margin-top:0}
+.mcat-hdr .dot{width:8px;height:8px;border-radius:50%}
+.mcat-hdr::after{content:'';flex:1;height:1px;background:var(--b2)}
+/* ── 파일 미리보기 (텍스트 파일용) ── */
+.pv-pre{max-height:72vh;overflow:auto;background:var(--s2);border:1px solid var(--bd);border-radius:var(--r);padding:16px;text-align:left;font-family:monospace;font-size:12px;white-space:pre-wrap;color:var(--tx);word-break:break-all}
 
 
 .sbar{display:flex;gap:10px;flex-wrap:wrap;padding:14px 20px;background:var(--s2);border-bottom:1px solid var(--bd)}
@@ -615,6 +647,7 @@ function showPage(name,btn){
     <button class="nav-btn" onclick="showPage('stats',this)">&#x1F4CA; Stats</button>
     <button class="nav-btn" id="nav-tasks" onclick="showPage('tasks',this)">&#x1F4CB; Tasks</button>
     <button class="nav-btn" id="nav-manual" onclick="showPage('manual',this)">&#x1F4C4; Manual</button>
+    <button class="nav-btn" id="nav-admin" onclick="showPage('admin',this)" style="display:none">&#9881;&#65039; Admin</button>
   </div>
   <div class="hdr-right" style="gap:8px">
     <div class="lang-toggle">
@@ -640,8 +673,7 @@ function showPage(name,btn){
       <div class="spill"><div class="snum" style="color:var(--bl)" id="s-tot">0</div><div class="slbl">Today Total</div></div>
       <div class="spill"><div class="snum" style="color:var(--ct)" id="s-ct">0</div><div class="slbl">Coater</div></div>
       <div class="spill"><div class="snum" style="color:var(--rp)" id="s-rp">0</div><div class="slbl">Roll Press</div></div>
-      <div class="spill"><div class="snum" style="color:var(--or)" id="s-rs">0</div><div class="slbl">Restart</div></div>
-      <div class="spill"><div class="snum" style="color:var(--gn)" id="s-pm">0</div><div class="slbl">Param Adj</div></div>
+      <div id="sbar-acts" style="display:contents"></div>
     </div>
     <div style="padding:8px 20px 12px;background:var(--s2)">
       <div style="font-size:11px;color:var(--dm);margin-bottom:5px" id="plbl">Today: 0 issues</div>
@@ -746,7 +778,7 @@ function showPage(name,btn){
   <div class="er" style="align-items:center">
     <select class="fsel" id="lf-proc" onchange="renderLog()"><option value="">All Process</option><option value="Coater">Coater</option><option value="RollPress">Roll Press</option></select>
     <select class="fsel" id="lf-ca" onchange="renderLog()"><option value="">All C/A</option><option value="C">Cathode</option><option value="A">Anode</option></select>
-    <select class="fsel" id="lf-sh" onchange="renderLog()"><option value="">All Shift</option><option value="D">Day</option><option value="N">Night</option></select>
+    <select class="fsel" id="lf-act" onchange="renderLog()"><option value="">All Action Type</option><option value="Parameter Adjust">Parameter Adjust</option><option value="Restart PC">Restart PC</option><option value="Restart Program">Restart Program</option><option value="HW Adjust">HW Adjust</option><option value="SW Adjust">SW Adjust</option><option value="SDC Reset">SDC Reset</option><option value="Cleaning">Cleaning</option></select>
     <div class="dr-wrap">
       <input type="date" id="lf-from" onchange="renderLog()">
       <span class="dr-sep">&#8594;</span>
@@ -756,6 +788,7 @@ function showPage(name,btn){
       <span class="srch-icon">&#128269;</span>
       <input class="fsrch" type="text" id="lf-kw" placeholder="Keyword or Lot ID..." oninput="renderLog()">
     </div>
+    <button class="btn btn-g btn-sm" onclick="reviewPrevDay()" title="지난 근무일(08:00~08:00) 항목 보기">&#128337; 지난 근무일</button>
     <button class="btn btn-g btn-sm" onclick="exportCSV()">&#11015; Export Excel</button>
     <button class="btn btn-d btn-sm admin-only" onclick="clearAll()" id="clear-all-btn" style="display:none">&#128465; Clear All</button>
     <button class="btn btn-g btn-sm" id="seed-btn" onclick="runSeedImport()" style="display:none">&#128196; Import Excel Data</button>
@@ -780,7 +813,7 @@ function showPage(name,btn){
 <div id="pg-stats" class="page">
   <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;flex-wrap:wrap">
     <select class="fsel" id="sf-proc" onchange="renderStats()"><option value="">All Process</option><option value="Coater">Coater</option><option value="RollPress">Roll Press</option></select>
-    <select class="fsel" id="sf-sh" onchange="renderStats()"><option value="">All Shift</option><option value="D">Day</option><option value="N">Night</option></select>
+    <select class="fsel" id="sf-act" onchange="renderStats()"><option value="">All Action Type</option><option value="Parameter Adjust">Parameter Adjust</option><option value="Restart PC">Restart PC</option><option value="Restart Program">Restart Program</option><option value="HW Adjust">HW Adjust</option><option value="SW Adjust">SW Adjust</option><option value="SDC Reset">SDC Reset</option><option value="Cleaning">Cleaning</option></select>
     <div style="flex:1"></div>
     <div class="dr-wrap">
       <input type="date" id="sf-from" onchange="onRangeCustom()">
@@ -820,6 +853,165 @@ function showPage(name,btn){
       <thead><tr><th>Week</th><th>Total</th><th>CT</th><th>RP</th><th>CT-C</th><th>CT-A</th><th>RP-C</th><th>RP-A</th><th>Day</th><th>Night</th><th>Restart</th><th>Param</th><th>HW</th><th>Duration</th></tr></thead>
       <tbody id="week-body"></tbody>
     </table></div></div>
+  </div>
+</div>
+
+<!-- Tasks Page (할일 + 파일) -->
+<div id="pg-tasks" class="page">
+  <!-- 오늘의 할일 -->
+  <div class="card">
+    <div class="ch">
+      <div class="ct">&#128203; 오늘의 할일</div>
+      <span class="tag t-gy" id="task-count-badge">0/0 완료</span>
+    </div>
+    <div style="padding:14px 20px 12px;border-bottom:1px solid var(--b2)">
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--mu);margin-bottom:7px">
+        <span style="font-weight:600;letter-spacing:.5px;text-transform:uppercase">진행도</span>
+        <span><span id="task-progress" style="font-weight:700;color:var(--tx)">0%</span> (<span id="task-done">0</span>/<span id="task-total">0</span>)</span>
+      </div>
+      <div class="pbar" style="height:6px"><div class="pfil" id="task-bar" style="width:0%"></div></div>
+    </div>
+    <div class="cb" style="padding:14px 20px 16px">
+      <div id="task-add-row" style="display:flex;gap:8px;margin-bottom:6px">
+        <input id="task-input" type="text" placeholder="할 일 입력..." onkeydown="if(event.key==='Enter')addTask()">
+        <button class="btn btn-p" onclick="addTask()" style="flex-shrink:0;white-space:nowrap">&#65291; 등록</button>
+      </div>
+      <div id="today-tasks-list"></div>
+    </div>
+  </div>
+
+  <!-- 과거 할일 -->
+  <div class="card">
+    <div class="ch" onclick="togglePastTasks()" style="cursor:pointer">
+      <div class="ct">&#128197; 과거 할일</div>
+      <span id="past-toggle" style="color:var(--mu);font-size:11px">&#9660;</span>
+    </div>
+    <div class="cb" id="past-tasks-wrap" style="padding:14px 20px;display:none">
+      <div id="past-tasks-list"></div>
+    </div>
+  </div>
+
+  <!-- Vision Check List -->
+  <div class="card">
+    <div class="ch">
+      <div class="ct">&#128193; Vision Check List</div>
+      <span class="tag t-gy" id="files-count">0</span>
+    </div>
+    <div class="cb" style="padding:14px 20px 16px">
+      <div id="files-list"></div>
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <label class="fpick" id="file-pick"
+          ondragover="event.preventDefault();this.classList.add('drag')"
+          ondragleave="this.classList.remove('drag')"
+          ondrop="this.classList.remove('drag')">
+          <input type="file" id="file-input" onchange="onFilePick(this,'file-pick-txt')">
+          <span style="font-size:15px">&#128206;</span>
+          <span class="fpick-txt" id="file-pick-txt"><b>파일 선택</b> 또는 드래그</span>
+        </label>
+        <button class="btn btn-p" onclick="uploadFile()" style="flex-shrink:0;white-space:nowrap">&#11014; 업로드</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Manual Page -->
+<div id="pg-manual" class="page">
+  <!-- 메뉴얼 업로드 -->
+  <div class="card">
+    <div class="ch">
+      <div class="ct">&#128228; 메뉴얼 업로드</div>
+    </div>
+    <div class="cb" style="padding:14px 20px 16px">
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <div class="field" style="flex:0 0 150px">
+          <label class="fl">공정</label>
+          <select id="manual-cat" onchange="syncManualSubcats()">
+            <option value="Coater">Coater</option>
+            <option value="RollPress">Roll Press</option>
+          </select>
+        </div>
+        <div class="field" style="flex:0 0 180px">
+          <label class="fl">분류</label>
+          <select id="manual-subcat"></select>
+        </div>
+        <div class="field" style="flex:1;min-width:200px">
+          <label class="fl">파일</label>
+          <div style="display:flex;gap:8px">
+            <label class="fpick" id="manual-pick"
+              ondragover="event.preventDefault();this.classList.add('drag')"
+              ondragleave="this.classList.remove('drag')"
+              ondrop="this.classList.remove('drag')">
+              <input type="file" id="manual-input" onchange="onFilePick(this,'manual-pick-txt')">
+              <span style="font-size:15px">&#128206;</span>
+              <span class="fpick-txt" id="manual-pick-txt"><b>파일 선택</b> 또는 드래그</span>
+            </label>
+            <button class="btn btn-p" onclick="uploadManual()" style="flex-shrink:0;white-space:nowrap">&#11014; 업로드</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 메뉴얼 목록 -->
+  <div class="card">
+    <div class="ch">
+      <div class="ct">&#128196; 메뉴얼 목록</div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div class="srch-wrap">
+          <span class="srch-icon">&#128269;</span>
+          <input class="fsrch" type="text" id="manual-search" placeholder="메뉴얼 검색..." oninput="renderManuals()">
+        </div>
+        <span class="tag t-gy" id="manuals-count">0</span>
+      </div>
+    </div>
+    <div class="cb" style="padding:14px 20px 16px">
+      <div id="manuals-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Admin Page (esmil 전용) -->
+<div id="pg-admin" class="page">
+  <!-- 계정 관리 -->
+  <div class="card">
+    <div class="ch">
+      <div class="ct">&#128101; 계정 관리</div>
+      <span class="tag t-gy" id="accounts-count">0</span>
+    </div>
+    <div class="cb" style="padding:14px 20px 16px">
+      <div id="accounts-list"></div>
+      <div style="border-top:1px solid var(--b2);margin-top:14px;padding-top:14px">
+        <div class="slbl2" style="margin-bottom:10px">&#65291; 새 계정 추가</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <input id="acc-username" type="text" placeholder="아이디 (영문/숫자)" autocapitalize="none" style="flex:1;min-width:130px">
+          <input id="acc-display" type="text" placeholder="표시 이름" style="flex:1;min-width:130px">
+          <select id="acc-role" style="flex:0 0 140px;width:auto">
+            <option value="cs">cs</option>
+            <option value="technician">technician</option>
+            <option value="admin">admin</option>
+          </select>
+          <input id="acc-password" type="password" placeholder="비밀번호" autocomplete="new-password" style="flex:1;min-width:130px">
+          <button class="btn btn-p" onclick="addAccount()" style="flex-shrink:0;white-space:nowrap">&#65291; 추가</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 감사 로그 -->
+  <div class="card">
+    <div class="ch">
+      <div class="ct">&#128373;&#65039; 감사 로그 <span style="font-weight:400;text-transform:none;letter-spacing:0">(7일 보관)</span></div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div class="srch-wrap">
+          <span class="srch-icon">&#128269;</span>
+          <input class="fsrch" type="text" id="audit-search" placeholder="계정/동작 검색..." oninput="renderAudit()">
+        </div>
+        <button class="btn btn-g btn-sm" onclick="loadAudit()">&#8635;</button>
+      </div>
+    </div>
+    <div class="cb" style="padding:14px 20px 16px">
+      <div id="audit-list" style="font-size:12px"></div>
+    </div>
   </div>
 </div>
 </div>
@@ -904,18 +1096,6 @@ function showPage(name,btn){
 </div>
 <style>
 #push-banner.show { transform: translateX(0); pointer-events:auto; }
-#pg-entry .main,
-#pg-log .main,
-#pg-stats .main {
-  padding: 0;
-}
-.card {
-  margin: 0 !important;
-  padding: 20px 28px !important;
-}
-.card + .card {
-  margin-top: 12px !important;
-}
 </style>
 <!-- Lightbox -->
 <div class="lb" id="lb" onclick="closeLB(event)" onwheel="lbWheel(event)">
@@ -953,6 +1133,29 @@ function isoWeek(ds) {
   var d=new Date(ds), j=new Date(d.getFullYear(),0,1);
   return Math.ceil(((d-j)/86400000+j.getDay()+1)/7);
 }
+
+// ── 근무일(Work day) = 08:00 → 다음날 08:00 (Michigan 기준) ──
+// Day shift 08:00-20:00, Night shift 20:00-다음날 08:00
+var OP_DAY_START_HOUR = 8;
+function opDate(offsetDays) {
+  var d = new Date(new Date().toLocaleString('en-US',{timeZone:'America/Detroit'}));
+  d.setHours(d.getHours() - OP_DAY_START_HOUR);
+  if (offsetDays) d.setDate(d.getDate() + offsetDays);
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function opToday()     { return opDate(0);  }  // 현재 근무일
+function opYesterday() { return opDate(-1); }  // 이전 근무일
+function opNext()      { return opDate(1);  }
+// cs/technician/nsys는 현재+이전 근무일 항목만 수정/삭제 가능, esmil(admin)은 무제한
+function canTouchEntry(e) {
+  if (session && session.role === 'admin') return true;
+  return !!(e && e.date && e.date >= opYesterday());
+}
+// 현재 시각 기준 교대조 자동 선택
+function autoShift() {
+  var h = new Date(new Date().toLocaleString('en-US',{timeZone:'America/Detroit'})).getHours();
+  return (h >= 8 && h < 20) ? 'D' : 'N';
+}
 function durToMin(s) {
   if(!s)return 0; var m=0;
   var hm=String(s).match(/(\d+)h/); if(hm)m+=parseInt(hm[1])*60;
@@ -981,11 +1184,11 @@ function setRange(r, render) {
 
 function getStatData() {
   var pf=document.getElementById('sf-proc').value;
-  var sf=document.getElementById('sf-sh').value;
+  var af=document.getElementById('sf-act').value;
   var to=today(); // always ceiling at Michigan today
   return data.filter(function(e){
     if(pf&&e.proc!==pf)return false;
-    if(sf&&e.shift!==sf)return false;
+    if(af&&e.action!==af)return false;
     if(sfFrom&&e.date<sfFrom)return false;
     if(e.date>to)return false;
     return true;
@@ -995,13 +1198,13 @@ function getStatData() {
 // ── Permission UI ──
 function applyPermissionUI() {
   var isAdmin=(session.role==='admin');
-  document.querySelectorAll('.log-edit-btn,.log-del-btn').forEach(function(b){
-    b.style.display=isAdmin?'':'none';
-  });
+  // 수정/삭제 버튼은 renderLog/eCard에서 근무일 기준으로 행별 표시 (canTouchEntry)
   var cb=document.getElementById('clear-all-btn');
   if(cb)cb.style.display=isAdmin?'':'none';
   var sb=document.getElementById('seed-btn');
   if(sb)sb.style.display=isAdmin?'':'none';
+  var na=document.getElementById('nav-admin');
+  if(na)na.style.display=isAdmin?'':'none';
 }
 
 // ── Logout ──
@@ -1173,9 +1376,7 @@ async function openEdit(id) {
     // Add to data array so it can be edited
     data.unshift(e);
   }
-  var isTodayEntry=(e.date===today());
-  if(!isTodayEntry&&!can('edit_past')){toast('과거 항목은 ESMIL 계정만 수정할 수 있습니다.',1);return;}
-  if(isTodayEntry&&!can('edit_today')){toast('수정 권한이 없습니다.',1);return;}
+  if(!canTouchEntry(e)){toast('현재/이전 근무일(08:00 기준) 항목만 수정할 수 있습니다. 그 이전은 ESMIL 계정만 가능합니다.',1);return;}
   editId=id;
   document.getElementById('e-date').value=e.date||'';
   document.getElementById('e-shift').value=e.shift||'D';
@@ -1304,7 +1505,8 @@ async function saveEdit(){
 
 // ── clearAll (admin only) ──
 async function delEntry(id){
-  if(!can('delete')){toast('ESMIL 계정만 삭제할 수 있습니다.',1);return;}
+  var e=data.find(function(x){return String(x.id)===String(id);});
+  if(e&&!canTouchEntry(e)){toast('현재/이전 근무일(08:00 기준) 항목만 삭제할 수 있습니다.',1);return;}
   if(!confirm('이 항목을 삭제하시겠습니까?'))return;
   var res=await apiDelete('/api/entries/'+encodeURIComponent(id));
   if(!res||!res.success){toast('삭제 실패.',1);return;}
@@ -1329,9 +1531,9 @@ async function clearAll() {
   await loadEntries();
 }
 
-// ── FCM Push Notifications (admin + technician only) ──
+// ── FCM Push Notifications (admin + technician + cs) ──
 var VAPID_KEY='BDXA3_CMW_2JpP9KGaGMutFtr84N-nZk7ATnuq46jEzHAkiCFklo1kakDP__LG6nI-MEoUxivJFDiA-XurglLDM';
-var NOTIFY_ROLES=['admin','technician'];
+var NOTIFY_ROLES=['admin','technician','cs'];
 var fcmToken=localStorage.getItem('fcm_token')||null;
 
 // Stable per-device id so multiple devices can each receive notifications
@@ -1748,6 +1950,7 @@ var statTab = 'daily';
 // Run after DOM is fully loaded
 document.addEventListener('DOMContentLoaded', function() {
   document.getElementById('f-date').value = today();
+  document.getElementById('f-shift').value = autoShift();
   buildActBtns();
   refreshVision();
   refreshLines();
@@ -1911,7 +2114,7 @@ function lotSearch(val) {
 
 function clearForm() {
   ['f-rev','f-lot','f-start','f-end','f-dur','f-status','f-action'].forEach(function(id){document.getElementById(id).value='';});
-  document.getElementById('f-shift').selectedIndex=0;
+  document.getElementById('f-shift').value=autoShift();
   document.getElementById('f-date').value=today();
   document.getElementById('f-vis').selectedIndex=0;
   clearActBtns();
@@ -1922,7 +2125,11 @@ function clearForm() {
 
 
 function renderToday() {
-  var td=today(),all=data.filter(function(e){return e.date===td;});
+  // 현재 근무일(08:00→08:00) 기준: 자정 이후의 야간조 항목(다음 날짜+N)도 포함
+  var ot=opToday(), nx=opNext();
+  var all=data.filter(function(e){
+    return e.date===ot || (e.date===nx && e.shift==='N');
+  });
   var items=all.slice().sort(function(a,b){
     var sa=a.start?toMin(a.start):99999, sb=b.start?toMin(b.start):99999;
     if(sa!==sb) return sa-sb;            // by Start time, earliest first
@@ -1932,10 +2139,15 @@ function renderToday() {
   document.getElementById('s-tot').textContent=all.length;
   document.getElementById('s-ct').textContent=all.filter(function(e){return e.proc==='Coater';}).length;
   document.getElementById('s-rp').textContent=all.filter(function(e){return e.proc==='RollPress';}).length;
-  document.getElementById('s-rs').textContent=all.filter(function(e){return e.action&&e.action.includes('Restart');}).length;
-  document.getElementById('s-pm').textContent=all.filter(function(e){return e.action==='Parameter Adjust';}).length;
+  // Action-type pills: only show types with count > 0
+  var actHtml='';
+  ACTS.forEach(function(a){
+    var n=all.filter(function(e){return e.action===a.val;}).length;
+    if(n>0)actHtml+='<div class="spill"><div class="snum" style="color:'+a.c+'">'+n+'</div><div class="slbl">'+a.icon+' '+a.val+'</div></div>';
+  });
+  document.getElementById('sbar-acts').innerHTML=actHtml;
   document.getElementById('pfil').style.width=Math.min(all.length*7,100)+'%';
-  document.getElementById('plbl').textContent='Today: '+all.length+' issue'+(all.length!==1?'s':'')+' logged';
+  document.getElementById('plbl').textContent='Work day (08:00 → 08:00): '+all.length+' issue'+(all.length!==1?'s':'')+' logged';
   var wrap=document.getElementById('today-list');
   if(!items.length){wrap.innerHTML='<div class="empty"><div class="ei">&#128205;</div><div class="et">No entries today</div><div class="es">Fill in the form above</div></div>';return;}
   wrap.innerHTML='<div class="elist">'+items.map(eCard).join('')+'</div>';
@@ -2028,8 +2240,10 @@ function eCard(e) {
 
     + '</div>'  // .eb
     + '<div style="flex-shrink:0;display:flex;flex-direction:column;gap:4px">'
-    + '<button class="btn btn-g btn-xs entry-edit-btn" data-id="'+e.id+'" onclick="openEdit(this.getAttribute(&quot;data-id&quot;))">&#9999;&#65039;</button>'
-    + (can('delete') ? '<button class="btn btn-xs" data-id="'+e.id+'" onclick="delEntry(this.getAttribute(&quot;data-id&quot;))" style="background:rgba(248,81,73,.15);color:#f85149;border:1px solid rgba(248,81,73,.3)">&#10005;</button>' : '')
+    + (canTouchEntry(e)
+        ? '<button class="btn btn-g btn-xs entry-edit-btn" data-id="'+e.id+'" onclick="openEdit(this.getAttribute(&quot;data-id&quot;))">&#9999;&#65039;</button>'
+          + '<button class="btn btn-xs" data-id="'+e.id+'" onclick="delEntry(this.getAttribute(&quot;data-id&quot;))" style="background:rgba(248,81,73,.15);color:#f85149;border:1px solid rgba(248,81,73,.3)">&#10005;</button>'
+        : '')
     + '</div>'
     + '</div>';
 }
@@ -2047,7 +2261,7 @@ function renderLog() {
     return; // fetchRange will call renderLog again
   }
   var pf=document.getElementById('lf-proc').value,cf=document.getElementById('lf-ca').value;
-  var sf=document.getElementById('lf-sh').value;
+  var af=document.getElementById('lf-act').value;
   var lfFrom=document.getElementById('lf-from');
   var lfTo=document.getElementById('lf-to');
   var fr=lfFrom.value, to=lfTo.value;
@@ -2055,7 +2269,7 @@ function renderLog() {
   var rows=data.slice().reverse();
   if(pf)rows=rows.filter(function(e){return e.proc===pf;});
   if(cf)rows=rows.filter(function(e){return e.ca===cf;});
-  if(sf)rows=rows.filter(function(e){return e.shift===sf;});
+  if(af)rows=rows.filter(function(e){return e.action===af;});
   if(fr)rows=rows.filter(function(e){return e.date>=fr;});
   if(to)rows=rows.filter(function(e){return e.date<=to;});
   if(kw)rows=rows.filter(function(e){return [e.reviewer,e.vision,e.action,e.status,e.act,e.lot].join(' ').toLowerCase().includes(kw);});
@@ -2073,7 +2287,7 @@ function renderLog() {
       : '<td style="color:var(--dm);font-size:11px">—</td>';
     var st=(transLang==='en'&&e.status_en)?e.status_en:(transLang==='ko'&&e.status_ko)?e.status_ko:(e.status||'—');
     var at=(transLang==='en'&&e.act_en)?e.act_en:(transLang==='ko'&&e.act_ko)?e.act_ko:(e.act||'—');
-    var adminBtns=session.role==='admin'
+    var adminBtns=canTouchEntry(e)
       ? '<td style="white-space:nowrap"><button class="btn btn-g btn-xs log-edit-btn" data-id="'+e.id+'" onclick="openEdit(this.getAttribute(\'data-id\'))">&#9999;&#65039;</button><button class="btn btn-d btn-xs log-del-btn" data-id="'+e.id+'" onclick="delEntry(this.getAttribute(\'data-id\'))">&#10005;</button></td>'
       : '<td></td>';
     var cols=[
@@ -2110,14 +2324,19 @@ function onRangeCustom(){
   renderStats();
 }
 
+// 아침 리뷰용: Log 범위를 지난 근무일(어제 08:00 ~ 오늘 08:00)로 설정
+function reviewPrevDay(){
+  document.getElementById('lf-from').value=opYesterday();
+  document.getElementById('lf-to').value=opToday();
+  renderLog();
+}
+
 
 function renderKPI(d){
   var t=d.length;
   var totDur=d.reduce(function(s,e){return s+durToMin(e.dur);},0);
   var coater=d.filter(function(e){return e.proc==='Coater';}).length;
   var rp=d.filter(function(e){return e.proc==='RollPress';}).length;
-  var restart=d.filter(function(e){return e.action&&e.action.includes('Restart');}).length;
-  var param=d.filter(function(e){return e.action==='Parameter Adjust';}).length;
   // period label
   var label = sfFrom===sfTo ? 'Today'
     : sfFrom ? sfFrom+' → '+sfTo
@@ -2129,11 +2348,14 @@ function renderKPI(d){
   var cards=[
     {v:t,        lbl:kpiLabel,       c:'var(--tx)',  bold:true},
     {v:coater,   lbl:'Coater',       c:'var(--ct)',  s:t?Math.round(coater/t*100)+'%':''},
-    {v:rp,       lbl:'Roll Press',   c:'var(--rp)',  s:t?Math.round(rp/t*100)+'%':''},
-    {v:restart,  lbl:'Restart',      c:'var(--rd)',  s:t?Math.round(restart/t*100)+'%':''},
-    {v:param,    lbl:'Param Adjust', c:'var(--ct)',  s:t?Math.round(param/t*100)+'%':''},
-    {v:fmtMin(totDur), lbl:'Total Duration', c:'var(--cy)', isStr:true}
+    {v:rp,       lbl:'Roll Press',   c:'var(--rp)',  s:t?Math.round(rp/t*100)+'%':''}
   ];
+  // Action-type cards: only shown when count > 0
+  ACTS.forEach(function(a){
+    var n=d.filter(function(e){return e.action===a.val;}).length;
+    if(n>0)cards.push({v:n, lbl:a.icon+' '+a.val, c:a.c, s:t?Math.round(n/t*100)+'%':''});
+  });
+  cards.push({v:fmtMin(totDur), lbl:'Total Duration', c:'var(--cy)', isStr:true});
   document.getElementById('kpi-main').innerHTML=cards.map(function(c){
     return '<div class="kc"><div class="kv" style="color:'+c.c+(c.bold?';font-size:32px':'')+'">'+(c.isStr?c.v:c.v)+'</div>'
       +'<div class="kl">'+c.lbl+'</div>'+(c.s?'<div class="ks">'+c.s+'</div>':'')+'</div>';
@@ -2426,100 +2648,6 @@ function toast(msg,isErr){var el=document.getElementById('toast');el.textContent
 
 
 </script>
-<!-- Tasks Page (할일 + 파일) -->
-<div id="pg-tasks" class="page">
-  <!-- 할일 등록 -->
-  <div class="card" style="padding:0;margin-bottom:16px">
-    <div class="cb">
-      <div style="display:flex;gap:10px">
-        <input id="task-input" type="text" placeholder="할 일 입력" style="flex:1;padding:10px;border:1px solid var(--bd);border-radius:var(--r);font-size:13px">
-        <button class="btn btn-p" onclick="addTask()" style="min-width:60px">등록</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- 프로그레스 바 -->
-  <div class="card" style="padding:0;margin-bottom:16px">
-    <div class="cb">
-      <div style="font-size:12px;margin-bottom:8px">진행도: <span id="task-progress">0%</span> (<span id="task-done">0</span>/<span id="task-total">0</span>)</div>
-      <div style="background:var(--dm);border-radius:var(--r);height:8px;overflow:hidden">
-        <div id="task-bar" style="background:var(--gr);height:100%;width:0%;transition:width 0.3s"></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 오늘의 할일 -->
-  <div class="card" style="padding:0;margin-bottom:16px">
-    <div class="ch">
-      <div class="ct">📋 오늘의 할일</div>
-    </div>
-    <div class="cb">
-      <div id="today-tasks-list" style="font-size:12px">할일이 없습니다</div>
-    </div>
-  </div>
-
-  <!-- 과거 할일 -->
-  <div class="card" style="padding:0;margin-bottom:16px">
-    <div class="ch" onclick="togglePastTasks()" style="cursor:pointer">
-      <div class="ct">📅 과거 할일</div>
-      <span id="past-toggle" style="float:right">▼</span>
-    </div>
-    <div class="cb">
-      <div id="past-tasks-list" style="display:none;font-size:12px"></div>
-    </div>
-  </div>
-
-  <!-- 파일 목록 -->
-  <div class="card" style="padding:0;margin-bottom:16px">
-    <div class="ch">
-      <div class="ct">📁 Vision Check List</div>
-    </div>
-    <div class="cb">
-      <div id="files-list" style="font-size:12px">파일이 없습니다</div>
-    </div>
-  </div>
-
-  <!-- 파일 업로드 -->
-  <div class="card" style="padding:0;margin-bottom:16px">
-    <div class="cb">
-      <div style="display:flex;gap:10px">
-        <input id="file-input" type="file" style="flex:1;padding:10px;border:1px solid var(--bd);border-radius:var(--r);font-size:13px">
-        <button class="btn btn-p" onclick="uploadFile()" style="min-width:60px">업로드</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Manual Page -->
-<div id="pg-manual" class="page">
-  <!-- 메뉴얼 업로드 -->
-  <div class="card" style="padding:0;margin-bottom:16px">
-    <div class="cb">
-      <div style="display:grid;grid-template-columns:1fr 1fr 60px;gap:10px">
-        <select id="manual-category" style="padding:10px;border:1px solid var(--bd);border-radius:var(--r);font-size:13px">
-          <option value="기타">기타</option>
-          <option value="작업 지침">작업 지침</option>
-          <option value="설치 가이드">설치 가이드</option>
-          <option value="유지보수">유지보수</option>
-          <option value="사용 설명서">사용 설명서</option>
-          <option value="신청서/양식">신청서/양식</option>
-        </select>
-        <input id="manual-input" type="file" style="padding:10px;border:1px solid var(--bd);border-radius:var(--r);font-size:13px">
-        <button class="btn btn-p" onclick="uploadManual()">업로드</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- 메뉴얼 목록 -->
-  <div class="card" style="padding:0;margin-bottom:16px">
-    <div class="ch">
-      <div class="ct">📄 메뉴얼 목록</div>
-    </div>
-    <div class="cb">
-      <div id="manuals-list" style="font-size:12px">메뉴얼이 없습니다</div>
-    </div>
-  </div>
-</div>
 <!-- 파일 미리보기 모달 -->
 <div id="file-preview-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:1000;overflow:auto">
   <div style="position:relative;margin:20px auto;max-width:90%;max-height:90%;background:var(--bg);border-radius:var(--r)">
@@ -2571,47 +2699,123 @@ async function loadTasks() {
   }
 }
 
+function isAdminUser() {
+  return typeof session !== 'undefined' && session && session.role === 'admin';
+}
+
+function escAttr(s) {
+  return esc(s).replace(/"/g, '&quot;');
+}
+
+// "07-03 14:32" 형태로 완료시각 표시 (브라우저 로컬 시간)
+function fmtWhen(iso) {
+  var d = new Date(iso);
+  if (isNaN(d)) return '';
+  function p(n) { return String(n).padStart(2, '0'); }
+  return p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+}
+
+var editingTaskId = null;
+
+function editTask(taskId) {
+  editingTaskId = taskId;
+  renderTasks();
+  var inp = document.getElementById('task-edit-input');
+  if (inp) { inp.focus(); inp.select(); }
+}
+
+function cancelTaskEdit() {
+  editingTaskId = null;
+  renderTasks();
+}
+
+async function saveTaskEdit(taskId) {
+  var inp = document.getElementById('task-edit-input');
+  var title = inp ? inp.value.trim() : '';
+  if (!title) { alert('내용을 입력하세요'); return; }
+  var token = localStorage.getItem('ws_token') || '';
+  try {
+    var r = await fetch('/api/tasks/' + taskId, {
+      method: 'PUT',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: title })
+    });
+    if (r.ok) {
+      editingTaskId = null;
+      await loadTasks();
+    } else {
+      alert('수정 실패: ' + r.status);
+    }
+  } catch(e) {
+    alert('오류: ' + e.message);
+  }
+}
+
+function taskRow(t) {
+  var chk = '<div class="tchk' + (t.completed ? ' on' : '') + '" onclick="toggleTask(\'' + t.id + '\')">' + (t.completed ? '&#10003;' : '') + '</div>';
+
+  // 인라인 수정 모드
+  if (editingTaskId === t.id) {
+    return '<div class="task-row">' + chk
+      + '<input id="task-edit-input" type="text" value="' + escAttr(t.title) + '" style="flex:1" onkeydown="if(event.key===\'Enter\')saveTaskEdit(\'' + t.id + '\');if(event.key===\'Escape\')cancelTaskEdit()">'
+      + '<button class="btn btn-xs btn-p" onclick="saveTaskEdit(\'' + t.id + '\')">&#10003; 저장</button>'
+      + '<button class="btn btn-xs btn-g" onclick="cancelTaskEdit()">&#10005; 취소</button>'
+      + '</div>';
+  }
+
+  var btns = isAdminUser()
+    ? '<button class="btn btn-xs btn-g" onclick="editTask(\'' + t.id + '\')">수정</button>'
+      + '<button class="btn btn-xs btn-d" onclick="deleteTask(\'' + t.id + '\')">삭제</button>'
+    : '';
+  var meta = (t.completed && t.completedBy)
+    ? '<span class="task-meta">&#10003; ' + esc(t.completedBy) + (t.completedAt ? ' · ' + fmtWhen(t.completedAt) : '') + '</span>'
+    : '';
+  return '<div class="task-row">' + chk
+    + '<span class="task-txt' + (t.completed ? ' done' : '') + '" onclick="toggleTask(\'' + t.id + '\')">' + esc(t.title) + meta + '</span>'
+    + btns + '</div>';
+}
+
 function renderTasks() {
   var range = getTodayRange();
   var todayStr = getDateString(range.start);
-  
+
   var todayTasks = tasks.filter(function(t) {
     return (t.createdDate || todayStr) === todayStr;
   });
-  
+
   var pastTasks = tasks.filter(function(t) {
     return (t.createdDate || todayStr) !== todayStr;
   });
-  
+
   // 프로그레스 바
   var done = todayTasks.filter(function(t) { return t.completed; }).length;
-  var total = todayTasks.length || 1;
-  var pct = Math.round((done / total) * 100);
-  
+  var pct = todayTasks.length ? Math.round((done / todayTasks.length) * 100) : 0;
+
   document.getElementById('task-done').textContent = done;
-  document.getElementById('task-total').textContent = total;
+  document.getElementById('task-total').textContent = todayTasks.length;
   document.getElementById('task-progress').textContent = pct + '%';
   document.getElementById('task-bar').style.width = pct + '%';
-  
+  var badge = document.getElementById('task-count-badge');
+  badge.textContent = done + '/' + todayTasks.length + ' 완료';
+  badge.className = 'tag ' + (todayTasks.length && done === todayTasks.length ? 't-gn' : 't-gy');
+
+  // 할일 등록 줄은 admin만
+  var addRow = document.getElementById('task-add-row');
+  if (addRow) addRow.style.display = isAdminUser() ? 'flex' : 'none';
+
   // 오늘의 할일
   var html = '';
   if (todayTasks.length === 0) {
-    html = '<div style="color:var(--mu)">할일이 없습니다</div>';
+    html = '<div class="empty" style="padding:18px 0"><div class="ei">&#127881;</div><div class="et">오늘의 할일이 없습니다</div></div>';
   } else {
-    todayTasks.forEach(function(t) {
-      var checked = t.completed ? '☑' : '☐';
-      html += '<div style="padding:8px 0;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--bd)">';
-      html += '<span style="cursor:pointer" onclick="toggleTask(\'' + t.id + '\')">' + checked + ' ' + t.title + '</span>';
-      html += '<button class="btn btn-xs btn-d" onclick="deleteTask(\'' + t.id + '\')">삭제</button>';
-      html += '</div>';
-    });
+    html = todayTasks.map(taskRow).join('');
   }
   document.getElementById('today-tasks-list').innerHTML = html;
-  
+
   // 과거 할일
   var pastHtml = '';
   if (pastTasks.length === 0) {
-    pastHtml = '<div style="color:var(--mu);padding:8px">과거 할일이 없습니다</div>';
+    pastHtml = '<div style="color:var(--mu);font-size:12px">과거 할일이 없습니다</div>';
   } else {
     var byDate = {};
     pastTasks.forEach(function(t) {
@@ -2619,31 +2823,24 @@ function renderTasks() {
       if (!byDate[d]) byDate[d] = [];
       byDate[d].push(t);
     });
-    
+
     Object.keys(byDate).sort().reverse().forEach(function(date) {
-      pastHtml += '<div style="margin-bottom:12px"><div style="font-weight:700;margin-bottom:6px">' + date + '</div>';
-      byDate[date].forEach(function(t) {
-        var checked = t.completed ? '☑' : '☐';
-        pastHtml += '<div style="padding:6px 0;display:flex;justify-content:space-between;align-items:center;margin-left:12px;border-bottom:1px solid var(--bd);font-size:12px">';
-        pastHtml += '<span style="cursor:pointer" onclick="toggleTask(\'' + t.id + '\')">' + checked + ' ' + t.title + '</span>';
-        pastHtml += '<button class="btn btn-xs btn-d" onclick="deleteTask(\'' + t.id + '\')">삭제</button>';
-        pastHtml += '</div>';
-      });
-      pastHtml += '</div>';
+      pastHtml += '<div class="task-date">&#128197; ' + date + '</div>';
+      pastHtml += byDate[date].map(taskRow).join('');
     });
   }
   document.getElementById('past-tasks-list').innerHTML = pastHtml;
 }
 
 function togglePastTasks() {
-  var el = document.getElementById('past-tasks-list');
+  var el = document.getElementById('past-tasks-wrap');
   var toggle = document.getElementById('past-toggle');
   if (el.style.display === 'none') {
     el.style.display = 'block';
-    toggle.textContent = '▲';
+    toggle.innerHTML = '&#9650;';
   } else {
     el.style.display = 'none';
-    toggle.textContent = '▼';
+    toggle.innerHTML = '&#9660;';
   }
 }
 
@@ -2748,19 +2945,61 @@ async function loadFiles() {
   }
 }
 
+// 커스텀 파일 선택 컨트롤 (Choose File 대체)
+function onFilePick(inp, txtId) {
+  var f = inp.files[0];
+  var el = document.getElementById(txtId);
+  var lab = inp.closest('label');
+  if (f) {
+    el.textContent = f.name;
+    if (lab) lab.classList.add('has-file');
+  } else {
+    el.innerHTML = '<b>파일 선택</b> 또는 드래그';
+    if (lab) lab.classList.remove('has-file');
+  }
+}
+
+function resetFilePick(inputId, txtId) {
+  var inp = document.getElementById(inputId);
+  inp.value = '';
+  onFilePick(inp, txtId);
+}
+
+function fileIcon(name) {
+  var ext = String(name || '').split('.').pop().toLowerCase();
+  if (['jpg','jpeg','png','gif','webp','bmp'].indexOf(ext) !== -1) return '&#128444;&#65039;';
+  if (ext === 'pdf') return '&#128196;';
+  if (['xls','xlsx','csv'].indexOf(ext) !== -1) return '&#128202;';
+  if (['doc','docx','hwp','txt'].indexOf(ext) !== -1) return '&#128221;';
+  if (['ppt','pptx'].indexOf(ext) !== -1) return '&#128200;';
+  if (['zip','rar','7z'].indexOf(ext) !== -1) return '&#128230;';
+  return '&#128206;';
+}
+
+function fmtSize(bytes) {
+  var kb = (bytes || 0) / 1024;
+  return kb >= 1024 ? (kb / 1024).toFixed(1) + 'MB' : Math.max(1, Math.round(kb)) + 'KB';
+}
+
 function renderFiles() {
+  var cnt = document.getElementById('files-count');
+  if (cnt) cnt.textContent = files.length;
   var html = '';
   if (files.length === 0) {
-    html = '<div style="color:var(--mu)">파일이 없습니다</div>';
+    html = '<div class="empty" style="padding:18px 0"><div class="ei">&#128193;</div><div class="et">파일이 없습니다</div></div>';
   } else {
     files.forEach(function(f) {
-      var size = Math.round((f.fileSize || 0) / 1024);
-      html += '<div style="padding:8px 0;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--bd);font-size:12px">';
-      html += '<span>' + f.fileName + ' (' + size + 'KB)</span>';
-      html += '<div style="display:flex;gap:6px">';
-      html += '<button class="btn btn-xs btn-p" onclick="previewFile(\'' + f.id + '\', \'' + f.fileName + '\')">보기</button>';
+      var realName = f.originalFileName || f.fileName;  // 확장자 포함 원본명
+      var del = isAdminUser()
+        ? '<button class="btn btn-xs btn-d" onclick="deleteFile(\'' + f.id + '\')">삭제</button>'
+        : '';
+      html += '<div class="file-row">';
+      html += '<div class="file-ic">' + fileIcon(realName) + '</div>';
+      html += '<div class="file-nm"><b>' + esc(f.fileName) + '</b><div class="file-meta">' + fmtSize(f.fileSize) + '</div></div>';
+      html += '<div class="file-acts">';
+      html += '<button class="btn btn-xs btn-g" onclick="previewFile(\'' + f.id + '\', \'' + escAttr(realName) + '\')">보기</button>';
       html += '<button class="btn btn-xs btn-p" onclick="downloadFile(\'' + f.id + '\')">다운</button>';
-      html += '<button class="btn btn-xs btn-d" onclick="deleteFile(\'' + f.id + '\')">삭제</button>';
+      html += del;
       html += '</div>';
       html += '</div>';
     });
@@ -2774,21 +3013,21 @@ async function uploadFile() {
     alert('파일을 선택하세요');
     return;
   }
-  
+
   var token = localStorage.getItem('ws_token') || '';
   var formData = new FormData();
   formData.append('file', file);
   formData.append('fileName', file.name.split('.')[0]);
-  
+
   try {
     var r = await fetch('/api/team-files/upload', {
       method: 'POST',
       headers: { 'Authorization': 'Bearer ' + token },
       body: formData
     });
-    
+
     if (r.ok) {
-      document.getElementById('file-input').value = '';
+      resetFilePick('file-input', 'file-pick-txt');
       await loadFiles();
     } else {
       alert('업로드 실패: ' + r.status);
@@ -2798,18 +3037,71 @@ async function uploadFile() {
   }
 }
 
-function previewFile(fileId, fileName) {
-  var ext = fileName.split('.').pop().toLowerCase();
-  
-  if (['jpg','jpeg','png','gif','webp'].indexOf(ext) !== -1) {
-    document.getElementById('file-preview-content').innerHTML = '<img src="/api/team-files/' + fileId + '/download" style="max-width:100%;max-height:80vh">';
-  } else if (['pdf'].indexOf(ext) !== -1) {
-    document.getElementById('file-preview-content').innerHTML = '<iframe src="/api/team-files/' + fileId + '/download" style="width:100%;height:80vh;border:none"></iframe>';
-  } else {
-    document.getElementById('file-preview-content').innerHTML = '<div style="padding:20px;color:var(--mu)">미리보기를 지원하지 않습니다.<br><button class="btn btn-p" onclick="downloadFile(\'' + fileId + '\')">다운로드</button></div>';
+// 인증 토큰을 붙여 파일을 받아온다 (window.location 방식은 401이 나므로 사용 금지)
+async function fetchAuthBlob(url) {
+  var token = localStorage.getItem('ws_token') || '';
+  var r = await fetch(url, { headers: { 'Authorization': 'Bearer ' + token } });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return await r.blob();
+}
+
+async function authDownload(url, fileName) {
+  try {
+    var blob = await fetchAuthBlob(url);
+    var u = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = u; a.download = fileName || 'download';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function() { URL.revokeObjectURL(u); }, 5000);
+  } catch(e) {
+    alert('다운로드 실패: ' + e.message);
   }
-  
+}
+
+// Office 문서는 Microsoft 공식 뷰어로 표시 (백엔드가 발급한 15분짜리 서명 URL 사용)
+var OFFICE_EXTS = ['xlsx', 'xls', 'docx', 'doc', 'pptx', 'ppt'];
+
+async function fetchPreviewUrl(downloadUrl) {
+  var token = localStorage.getItem('ws_token') || '';
+  var r = await fetch(downloadUrl.replace(/\/download$/, '/preview-url'),
+                      { headers: { 'Authorization': 'Bearer ' + token } });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return (await r.json()).url;
+}
+
+async function previewBlob(url, fileName, downloadFn) {
+  var ext = String(fileName || '').split('.').pop().toLowerCase();
+  var box = document.getElementById('file-preview-content');
   document.getElementById('file-preview-modal').style.display = 'block';
+  box.innerHTML = '<div style="padding:30px;color:var(--mu)">불러오는 중...</div>';
+  try {
+    if (['jpg','jpeg','png','gif','webp','bmp'].indexOf(ext) !== -1) {
+      var blob = await fetchAuthBlob(url);
+      box.innerHTML = '<img src="' + URL.createObjectURL(blob) + '" style="max-width:100%;max-height:80vh">';
+
+    } else if (ext === 'pdf') {
+      var blob = await fetchAuthBlob(url);
+      box.innerHTML = '<iframe src="' + URL.createObjectURL(blob) + '" style="width:100%;height:80vh;border:none"></iframe>';
+
+    } else if (OFFICE_EXTS.indexOf(ext) !== -1) {
+      var signed = await fetchPreviewUrl(url);
+      box.innerHTML = '<iframe src="https://view.officeapps.live.com/op/embed.aspx?src='
+        + encodeURIComponent(signed) + '" style="width:100%;height:80vh;border:none"></iframe>';
+
+    } else if (['txt','log','md','json','csv'].indexOf(ext) !== -1) {
+      var t = await (await fetchAuthBlob(url)).text();
+      box.innerHTML = '<div class="pv-pre">' + esc(t.slice(0, 200000)) + '</div>';
+
+    } else {
+      box.innerHTML = '<div style="padding:20px;color:var(--mu)">미리보기를 지원하지 않는 형식입니다 (.' + esc(ext) + ')<br><br><button class="btn btn-p" onclick="' + downloadFn + '">&#11015; 다운로드</button></div>';
+    }
+  } catch(e) {
+    box.innerHTML = '<div style="padding:20px;color:var(--rd)">미리보기 실패: ' + esc(e.message) + '</div>';
+  }
+}
+
+function previewFile(fileId, fileName) {
+  previewBlob('/api/team-files/' + fileId + '/download', fileName, "downloadFile('" + fileId + "')");
 }
 
 function closeFilePreview() {
@@ -2817,7 +3109,8 @@ function closeFilePreview() {
 }
 
 function downloadFile(fileId) {
-  window.location.href = '/api/team-files/' + fileId + '/download';
+  var f = files.find(function(x) { return x.id === fileId; });
+  authDownload('/api/team-files/' + fileId + '/download', f ? (f.originalFileName || f.fileName) : 'download');
 }
 
 async function deleteFile(fileId) {
@@ -2844,6 +3137,22 @@ async function deleteFile(fileId) {
 
 var manuals = [];
 
+// 2단계 카테고리: 공정 → 분류
+var MANUAL_CATS = {
+  'Coater':    ['Vision', 'Thickness', 'Sliding', 'Insulation Thickness'],
+  'RollPress': ['Vision', 'Thickness', 'Align Vision']
+};
+var MANUAL_CAT_LABEL = { 'Coater': 'Coater', 'RollPress': 'Roll Press' };
+var MANUAL_CAT_COLOR = { 'Coater': 'var(--ct)', 'RollPress': 'var(--rp)' };
+
+function syncManualSubcats() {
+  var cat = document.getElementById('manual-cat').value;
+  var sub = document.getElementById('manual-subcat');
+  sub.innerHTML = (MANUAL_CATS[cat] || []).map(function(s) {
+    return '<option value="' + s + '">' + s + '</option>';
+  }).join('');
+}
+
 async function loadManuals() {
   var token = localStorage.getItem('ws_token') || '';
   try {
@@ -2861,31 +3170,56 @@ async function loadManuals() {
   }
 }
 
+function manualRow(m) {
+  var del = isAdminUser()
+    ? '<button class="btn btn-xs btn-d" onclick="deleteManual(\'' + m.id + '\')">삭제</button>'
+    : '';
+  var sub = m.subcategory
+    ? '<span class="tag t-bl" style="font-size:10px;padding:1px 7px">' + esc(m.subcategory) + '</span>'
+    : '';
+  return '<div class="file-row">'
+    + '<div class="file-ic">' + fileIcon(m.fileName || m.title) + '</div>'
+    + '<div class="file-nm"><b>' + esc(m.title) + '</b>'
+    + '<div class="file-meta">' + sub + '<span>' + esc(m.fileName || '') + '</span><span>·</span><span>' + fmtSize(m.fileSize) + '</span></div></div>'
+    + '<div class="file-acts">'
+    + '<button class="btn btn-xs btn-g" onclick="previewManual(\'' + m.id + '\')">보기</button>'
+    + '<button class="btn btn-xs btn-p" onclick="downloadManual(\'' + m.id + '\')">다운</button>'
+    + del
+    + '</div></div>';
+}
+
 function renderManuals() {
+  var cnt = document.getElementById('manuals-count');
+  if (cnt) cnt.textContent = manuals.length;
+  var q = (document.getElementById('manual-search') ? document.getElementById('manual-search').value : '').toLowerCase().trim();
+  var shown = q ? manuals.filter(function(m) {
+    return [m.title, m.fileName, m.category, m.subcategory].join(' ').toLowerCase().indexOf(q) !== -1;
+  }) : manuals;
   var html = '';
   if (manuals.length === 0) {
-    html = '<div style="color:var(--mu)">메뉴얼이 없습니다</div>';
+    html = '<div class="empty" style="padding:18px 0"><div class="ei">&#128196;</div><div class="et">메뉴얼이 없습니다</div></div>';
+  } else if (shown.length === 0) {
+    html = '<div class="empty" style="padding:18px 0"><div class="ei">&#128269;</div><div class="et">검색 결과가 없습니다</div></div>';
   } else {
     var byCategory = {};
-    manuals.forEach(function(m) {
+    shown.forEach(function(m) {
       var cat = m.category || '기타';
       if (!byCategory[cat]) byCategory[cat] = [];
       byCategory[cat].push(m);
     });
-    
-    Object.keys(byCategory).sort().forEach(function(cat) {
-      html += '<div style="margin-bottom:12px"><div style="font-weight:700;margin-bottom:6px">📁 ' + cat + ' (' + byCategory[cat].length + ')</div>';
-      byCategory[cat].forEach(function(m) {
-        var size = Math.round((m.fileSize || 0) / 1024);
-        html += '<div style="padding:6px 12px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--bd);font-size:12px;margin-left:12px">';
-        html += '<span>' + m.title + ' (' + size + 'KB)</span>';
-        html += '<div style="display:flex;gap:6px">';
-        html += '<button class="btn btn-xs btn-p" onclick="downloadManual(\'' + m.id + '\')">다운</button>';
-        html += '<button class="btn btn-xs btn-d" onclick="deleteManual(\'' + m.id + '\')">삭제</button>';
-        html += '</div>';
-        html += '</div>';
-      });
-      html += '</div>';
+
+    // Coater → Roll Press → 기타(legacy) 순서
+    var order = ['Coater', 'RollPress'].concat(
+      Object.keys(byCategory).filter(function(c) { return c !== 'Coater' && c !== 'RollPress'; }).sort()
+    );
+    order.forEach(function(cat) {
+      var list = byCategory[cat];
+      if (!list || !list.length) return;
+      var color = MANUAL_CAT_COLOR[cat] || 'var(--mu)';
+      html += '<div class="mcat-hdr" style="color:' + color + '">'
+        + '<span class="dot" style="background:' + color + '"></span>'
+        + esc(MANUAL_CAT_LABEL[cat] || cat) + ' (' + list.length + ')</div>';
+      html += list.map(manualRow).join('');
     });
   }
   document.getElementById('manuals-list').innerHTML = html;
@@ -2897,23 +3231,23 @@ async function uploadManual() {
     alert('파일을 선택하세요');
     return;
   }
-  
+
   var token = localStorage.getItem('ws_token') || '';
   var formData = new FormData();
   formData.append('file', file);
-  formData.append('title', file.name.split('.')[0]);
-  formData.append('category', document.getElementById('manual-category').value);
-  
+  formData.append('title', file.name.replace(/\.[^.]+$/, ''));
+  formData.append('category', document.getElementById('manual-cat').value);
+  formData.append('subcategory', document.getElementById('manual-subcat').value);
+
   try {
     var r = await fetch('/api/manuals/upload', {
       method: 'POST',
       headers: { 'Authorization': 'Bearer ' + token },
       body: formData
     });
-    
+
     if (r.ok) {
-      document.getElementById('manual-input').value = '';
-      document.getElementById('manual-category').value = '기타';
+      resetFilePick('manual-input', 'manual-pick-txt');
       await loadManuals();
     } else {
       alert('업로드 실패: ' + r.status);
@@ -2924,7 +3258,13 @@ async function uploadManual() {
 }
 
 function downloadManual(manualId) {
-  window.location.href = '/api/manuals/' + manualId + '/download';
+  var m = manuals.find(function(x) { return x.id === manualId; });
+  authDownload('/api/manuals/' + manualId + '/download', m ? (m.fileName || m.title) : 'download');
+}
+
+function previewManual(manualId) {
+  var m = manuals.find(function(x) { return x.id === manualId; });
+  previewBlob('/api/manuals/' + manualId + '/download', m ? (m.fileName || m.title) : '', "downloadManual('" + manualId + "')");
 }
 
 async function deleteManual(manualId) {
@@ -2943,6 +3283,155 @@ async function deleteManual(manualId) {
   } catch(e) {
     console.error('Delete error:', e);
   }
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// ADMIN: 계정 관리 & 감사 로그 (esmil 전용)
+// ════════════════════════════════════════════════════════════════════════
+
+var accounts = [];
+var auditLogs = [];
+
+async function apiJson(url, method, body) {
+  var token = localStorage.getItem('ws_token') || '';
+  var opt = { method: method || 'GET', headers: { 'Authorization': 'Bearer ' + token } };
+  if (body) { opt.headers['Content-Type'] = 'application/json'; opt.body = JSON.stringify(body); }
+  var r = await fetch(url, opt);
+  var d = null;
+  try { d = await r.json(); } catch(e) {}
+  if (!r.ok) throw new Error((d && d.detail) || ('HTTP ' + r.status));
+  return d;
+}
+
+async function loadAccounts() {
+  try {
+    var d = await apiJson('/api/accounts');
+    accounts = d.accounts || [];
+    renderAccounts();
+  } catch(e) { console.error('Accounts error:', e); }
+}
+
+function renderAccounts() {
+  var cnt = document.getElementById('accounts-count');
+  if (cnt) cnt.textContent = accounts.length;
+  var html = '';
+  accounts.forEach(function(a) {
+    var isSelf = session && session.username === a.username;
+    var roleTag = a.role === 'admin' ? 't-pu' : (a.role === 'technician' ? 't-cy' : 't-bl');
+    html += '<div class="file-row">'
+      + '<div class="file-ic">' + (a.role === 'admin' ? '&#128081;' : '&#128100;') + '</div>'
+      + '<div class="file-nm"><b>' + esc(a.username) + (isSelf ? ' <span style="color:var(--dm);font-weight:400">(나)</span>' : '') + '</b>'
+      + '<div class="file-meta"><span class="tag ' + roleTag + '" style="font-size:10px;padding:1px 7px">' + esc(a.role) + '</span><span>' + esc(a.display || '') + '</span></div></div>'
+      + '<div class="file-acts">'
+      + '<button class="btn btn-xs btn-g" onclick="changeAccountPw(\'' + a.username + '\')">비밀번호</button>'
+      + (isSelf ? '' : '<button class="btn btn-xs btn-g" onclick="changeAccountRole(\'' + a.username + '\')">역할</button>'
+                     + '<button class="btn btn-xs btn-d" onclick="deleteAccount(\'' + a.username + '\')">삭제</button>')
+      + '</div></div>';
+  });
+  document.getElementById('accounts-list').innerHTML = html || '<div style="color:var(--mu)">계정이 없습니다</div>';
+}
+
+async function addAccount() {
+  var username = document.getElementById('acc-username').value.trim().toLowerCase();
+  var display = document.getElementById('acc-display').value.trim();
+  var role = document.getElementById('acc-role').value;
+  var password = document.getElementById('acc-password').value;
+  if (!username || !password) { alert('아이디와 비밀번호를 입력하세요'); return; }
+  try {
+    await apiJson('/api/accounts', 'POST', { username: username, display: display, role: role, password: password });
+    document.getElementById('acc-username').value = '';
+    document.getElementById('acc-display').value = '';
+    document.getElementById('acc-password').value = '';
+    toast('계정이 저장되었습니다 ✓');
+    await loadAccounts(); loadAudit();
+  } catch(e) { alert('실패: ' + e.message); }
+}
+
+async function changeAccountPw(username) {
+  var pw = prompt("'" + username + "' 계정의 새 비밀번호:");
+  if (!pw) return;
+  var a = accounts.find(function(x) { return x.username === username; }) || {};
+  try {
+    await apiJson('/api/accounts', 'POST', { username: username, display: a.display, role: a.role, password: pw });
+    toast('비밀번호가 변경되었습니다 ✓');
+    loadAudit();
+  } catch(e) { alert('실패: ' + e.message); }
+}
+
+async function changeAccountRole(username) {
+  var a = accounts.find(function(x) { return x.username === username; }) || {};
+  var role = prompt("'" + username + "' 계정의 역할 (admin / cs / technician):", a.role || 'cs');
+  if (!role) return;
+  role = role.trim().toLowerCase();
+  if (['admin','cs','technician'].indexOf(role) === -1) { alert('admin, cs, technician 중 하나를 입력하세요'); return; }
+  try {
+    await apiJson('/api/accounts', 'POST', { username: username, display: a.display, role: role });
+    toast('역할이 변경되었습니다 ✓');
+    await loadAccounts(); loadAudit();
+  } catch(e) { alert('실패: ' + e.message); }
+}
+
+async function deleteAccount(username) {
+  if (!confirm("'" + username + "' 계정을 삭제하시겠습니까?")) return;
+  try {
+    await apiJson('/api/accounts/' + encodeURIComponent(username), 'DELETE');
+    toast('계정이 삭제되었습니다 ✓');
+    await loadAccounts(); loadAudit();
+  } catch(e) { alert('실패: ' + e.message); }
+}
+
+var AUDIT_LABELS = {
+  entry_create:      ['기록 등록', 't-gn'],
+  entry_edit:        ['기록 수정', 't-bl'],
+  entry_delete:      ['기록 삭제', 't-rd'],
+  entry_bulk_import: ['기록 일괄등록', 't-or'],
+  task_create:       ['할일 등록', 't-gn'],
+  task_edit:         ['할일 수정', 't-bl'],
+  task_check:        ['할일 체크', 't-cy'],
+  task_uncheck:      ['체크 해제', 't-gy'],
+  task_delete:       ['할일 삭제', 't-rd'],
+  manual_upload:     ['메뉴얼 업로드', 't-gn'],
+  manual_delete:     ['메뉴얼 삭제', 't-rd'],
+  teamfile_upload:   ['파일 업로드', 't-gn'],
+  teamfile_delete:   ['파일 삭제', 't-rd'],
+  account_create:    ['계정 생성', 't-pu'],
+  account_update:    ['계정 변경', 't-pu'],
+  account_delete:    ['계정 삭제', 't-rd'],
+  login_fail:        ['로그인 실패', 't-rd']
+};
+
+async function loadAudit() {
+  try {
+    var d = await apiJson('/api/audit?limit=300');
+    auditLogs = d.logs || [];
+    renderAudit();
+  } catch(e) { console.error('Audit error:', e); }
+}
+
+function renderAudit() {
+  var q = (document.getElementById('audit-search') ? document.getElementById('audit-search').value : '').toLowerCase().trim();
+  var shown = auditLogs.filter(function(l) {
+    if (!q) return true;
+    var lbl = (AUDIT_LABELS[l.action] || [l.action])[0];
+    return [l.user, l.action, lbl, l.detail, l.target].join(' ').toLowerCase().indexOf(q) !== -1;
+  });
+  var html = '';
+  if (!auditLogs.length) {
+    html = '<div class="empty" style="padding:18px 0"><div class="ei">&#128373;&#65039;</div><div class="et">기록된 로그가 없습니다</div></div>';
+  } else if (!shown.length) {
+    html = '<div style="color:var(--mu)">검색 결과가 없습니다</div>';
+  } else {
+    shown.forEach(function(l) {
+      var meta = AUDIT_LABELS[l.action] || [l.action, 't-gy'];
+      html += '<div class="task-row" style="cursor:default">'
+        + '<span style="color:var(--dm);font-family:monospace;font-size:11px;white-space:nowrap">' + fmtWhen(l.at) + '</span>'
+        + '<span class="tag t-gy" style="font-size:10px;padding:1px 7px">' + esc(l.user || '?') + '</span>'
+        + '<span class="tag ' + meta[1] + '" style="font-size:10px;padding:1px 7px;white-space:nowrap">' + meta[0] + '</span>'
+        + '<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--mu)">' + esc(l.detail || l.target || '') + '</span>'
+        + '</div>';
+    });
+  }
+  document.getElementById('audit-list').innerHTML = html;
 }
 
 // ════════════════════════════════════════════════════════════════════════
@@ -2967,12 +3456,16 @@ window.showPage = function(name, btn) {
     loadFiles();
   } else if (name === 'manual') {
     loadManuals();
+  } else if (name === 'admin') {
+    loadAccounts();
+    loadAudit();
   } else if (_originalShowPage) {
     _originalShowPage(name, btn);
   }
 };
 
 // 초기 로드
+syncManualSubcats();
 setTimeout(function() {
   loadTasks();
   loadFiles();
@@ -2980,336 +3473,6 @@ setTimeout(function() {
 }, 1000);
 </script>
 
-<script>
-// ════════════════════════════════════════════════════════════════════════
-// TASKS 관리
-// ════════════════════════════════════════════════════════════════════════
-
-var tasks = [];
-var teamFiles = [];
-
-// showPage 함수를 완전히 대체
-window.showPage = function(name, btn) {
-  document.querySelectorAll('.page').forEach(function(p) {
-    p.classList.remove('active');
-  });
-  
-  var pg = document.getElementById('pg-' + name);
-  if (pg) pg.classList.add('active');
-  
-  document.querySelectorAll('.nav-btn').forEach(function(b) {
-    b.classList.remove('active');
-  });
-  if (btn) btn.classList.add('active');
-  
-  var hasSession = typeof session !== 'undefined' && session && session.token;
-  if (!hasSession) return;
-  
-  if (typeof renderLog === 'function' && name === 'log') {
-    renderLog();
-  }
-  if (typeof renderStats === 'function' && name === 'stats') {
-    if (typeof setRange === 'function') setRange('today', false);
-    renderStats();
-  }
-  
-  if (name === 'tasks') {
-    loadTasks();
-    loadTeamFiles();
-  }
-  if (name === 'manual') {
-    loadManuals();
-  }
-};
-
-// Tasks 데이터 로드
-async function loadTeamFiles() {
-  var token = localStorage.getItem('ws_token') || '';
-  try {
-    var r = await fetch('/api/team-files', {
-      method: 'GET',
-      headers: {
-        'Authorization': 'Bearer ' + token,
-        'Content-Type': 'application/json'
-      }
-    });
-    
-    if (r.ok) {
-      var data = await r.json();
-      teamFiles = data.files || [];
-      renderTeamFilesList();
-    }
-  } catch(e) {
-    console.error('Team files error:', e);
-  }
-}
-
-function renderTeamFilesList() {
-  var container = document.getElementById('team-files-list');
-  if (!container) return;
-  
-  var html = '';
-  if (teamFiles.length === 0) {
-    html = '<div style="color:var(--mu);padding:20px">📁 팀 파일이 없습니다</div>';
-  } else {
-    html += '<table style="width:100%;font-size:12px">';
-    teamFiles.forEach(function(f) {
-      var size = Math.round((f.fileSize || 0) / 1024);
-      var delBtn = canDelete() ? '<button class="btn btn-xs btn-d" onclick="deleteTeamFile(\'' + f.id + '\')">삭제</button>' : '';
-      html += '<tr><td style="padding:8px">' + f.fileName + '</td><td style="text-align:right;padding:8px">' + size + 'KB</td><td style="text-align:right;padding:8px"><button class="btn btn-xs btn-p" onclick="downloadTeamFile(\'' + f.id + '\')">다운</button> ' + delBtn + '</td></tr>';
-    });
-    html += '</table>';
-  }
-  container.innerHTML = html;
-}
-
-function showTeamFileUpload() {
-  var perms = window.permissions || [];
-  if (perms.indexOf('upload_teamfiles') === -1) {
-    alert('업로드 권한이 없습니다');
-    return;
-  }
-  document.getElementById('team-file-form').style.display = 'block';
-}
-
-function cancelTeamFileUpload() {
-  document.getElementById('team-file-form').style.display = 'none';
-  document.getElementById('team-file-name').value = '';
-  document.getElementById('team-file-desc').value = '';
-  document.getElementById('team-file-input').value = '';
-}
-
-async function uploadTeamFile() {
-  var file = document.getElementById('team-file-input').files[0];
-  if (!file) {
-    alert('파일을 선택하세요');
-    return;
-  }
-  
-  var fileName = document.getElementById('team-file-name').value.trim() || file.name.split('.')[0];
-  var token = localStorage.getItem('ws_token') || '';
-  
-  var formData = new FormData();
-  formData.append('fileName', fileName);
-  formData.append('description', document.getElementById('team-file-desc').value);
-  formData.append('file', file);
-  
-  try {
-    var r = await fetch('/api/team-files/upload', {
-      method: 'POST',
-      headers: {
-        'Authorization': 'Bearer ' + token
-      },
-      body: formData
-    });
-    
-    if (r.ok) {
-      alert('업로드되었습니다');
-      cancelTeamFileUpload();
-      await loadTeamFiles();
-    } else {
-      alert('오류: ' + r.status);
-    }
-  } catch(e) {
-    alert('업로드 실패: ' + e.message);
-  }
-}
-
-function downloadTeamFile(fileId) {
-  window.location.href = '/api/team-files/' + fileId + '/download';
-}
-
-async function deleteTeamFile(fileId) {
-  if (!confirm('삭제하시겠습니까?')) return;
-  
-  var token = localStorage.getItem('ws_token') || '';
-  try {
-    var r = await fetch('/api/team-files/' + fileId, {
-      method: 'DELETE',
-      headers: {
-        'Authorization': 'Bearer ' + token
-      }
-    });
-    
-    if (r.ok) {
-      alert('삭제되었습니다');
-      await loadTeamFiles();
-    } else {
-      alert('오류: ' + r.status);
-    }
-  } catch(e) {
-    alert('삭제 실패: ' + e.message);
-  }
-}
-
-// ════════════════════════════════════════════════════════════════════════
-// MANUAL 관리
-// ════════════════════════════════════════════════════════════════════════
-
-var manuals = [];
-
-  var token = localStorage.getItem('ws_token') || '';
-  try {
-    var r = await fetch('/api/manuals', {
-      method: 'GET',
-      headers: {
-        'Authorization': 'Bearer ' + token,
-        'Content-Type': 'application/json'
-      }
-    });
-    
-    if (r.ok) {
-      var data = await r.json();
-      manuals = data.manuals || [];
-      renderManualsList();
-    }
-  } catch(e) {
-    console.error('Manuals error:', e);
-  }
-}
-
-function renderManualsList() {
-  var container = document.getElementById('manuals-list');
-  if (!container) return;
-  
-  var html = '';
-  if (manuals.length === 0) {
-    html = '<div style="color:var(--mu);padding:20px">📄 메뉴얼이 없습니다</div>';
-  } else {
-    var byCategory = {};
-    manuals.forEach(function(m) {
-      var cat = m.category || '기타';
-      if (!byCategory[cat]) byCategory[cat] = [];
-      byCategory[cat].push(m);
-    });
-    
-    Object.keys(byCategory).sort().forEach(function(cat) {
-      html += '<div style="margin-bottom:20px"><div style="font-weight:700;margin-bottom:10px">📁 ' + cat + ' (' + byCategory[cat].length + ')</div>';
-      
-      byCategory[cat].forEach(function(m) {
-        var size = Math.round((m.fileSize || 0) / 1024);
-        var delBtn = canDelete() ? '<button class="btn btn-sm btn-d" onclick="deleteManual(\'' + m.id + '\')">삭제</button>' : '';
-        html += '<div style="background:var(--sf);border:1px solid var(--bd);padding:12px;margin:8px 0;border-radius:var(--r);display:flex;justify-content:space-between;align-items:center">';
-        html += '<div><strong>' + m.title + '</strong><div style="font-size:11px;color:var(--dm);margin-top:4px">' + m.fileName + ' | ' + size + 'KB</div></div>';
-        html += '<div><button class="btn btn-sm btn-p" onclick="downloadManual(\'' + m.id + '\')">다운</button> ' + delBtn + '</div>';
-        html += '</div>';
-      });
-      html += '</div>';
-    });
-  }
-  container.innerHTML = html;
-}
-
-function showManualUpload() {
-  var perms = window.permissions || [];
-  if (perms.indexOf('manage_manual') === -1) {
-    alert('메뉴얼 관리 권한이 없습니다');
-    return;
-  }
-  document.getElementById('manual-form').style.display = 'block';
-}
-
-function cancelManualUpload() {
-  document.getElementById('manual-form').style.display = 'none';
-  document.getElementById('manual-title').value = '';
-  document.getElementById('manual-category').value = '기타';
-  document.getElementById('manual-input').value = '';
-}
-
-async function uploadManual() {
-  var title = document.getElementById('manual-title').value.trim();
-  var file = document.getElementById('manual-input').files[0];
-  
-  if (!title || !file) {
-    alert('제목과 파일을 입력하세요');
-    return;
-  }
-  
-  var token = localStorage.getItem('ws_token') || '';
-  var formData = new FormData();
-  formData.append('title', title);
-  formData.append('category', document.getElementById('manual-category').value);
-  formData.append('file', file);
-  
-  try {
-    var r = await fetch('/api/manuals/upload', {
-      method: 'POST',
-      headers: {
-        'Authorization': 'Bearer ' + token
-      },
-      body: formData
-    });
-    
-    if (r.ok) {
-      alert('업로드되었습니다');
-      cancelManualUpload();
-      await loadManuals();
-    } else {
-      alert('오류: ' + r.status);
-    }
-  } catch(e) {
-    alert('업로드 실패: ' + e.message);
-  }
-}
-
-function downloadManual(manualId) {
-  window.location.href = '/api/manuals/' + manualId + '/download';
-}
-
-async function deleteManual(manualId) {
-  if (!confirm('삭제하시겠습니까?')) return;
-  
-  var token = localStorage.getItem('ws_token') || '';
-  try {
-    var r = await fetch('/api/manuals/' + manualId, {
-      method: 'DELETE',
-      headers: {
-        'Authorization': 'Bearer ' + token
-      }
-    });
-    
-    if (r.ok) {
-      alert('삭제되었습니다');
-      await loadManuals();
-    } else {
-      alert('오류: ' + r.status);
-    }
-  } catch(e) {
-    alert('삭제 실패: ' + e.message);
-  }
-}
-
-// ════════════════════════════════════════════════════════════════════════
-// 권한 체크
-// ════════════════════════════════════════════════════════════════════════
-
-function canEdit() {
-  var perms = window.permissions || [];
-  return perms.indexOf('manage_tasks') !== -1;
-}
-
-function canDelete() {
-  var perms = window.permissions || [];
-  return perms.indexOf('delete_teamfiles') !== -1 || perms.indexOf('manage_manual') !== -1;
-}
-
-// 로그인 후 UI 업데이트
-setTimeout(function() {
-  var perms = window.permissions || [];
-  if (perms.indexOf('manage_tasks') !== -1) {
-    var btn = document.getElementById('new-task-btn');
-    if (btn) btn.style.display = 'inline-flex';
-  }
-  if (perms.indexOf('upload_teamfiles') !== -1) {
-    var btn = document.getElementById('upload-teamfile-btn');
-    if (btn) btn.style.display = 'inline-flex';
-  }
-  if (perms.indexOf('manage_manual') !== -1) {
-    var btn = document.getElementById('upload-manual-btn');
-    if (btn) btn.style.display = 'inline-flex';
-  }
-}, 1000);
-</script>
 
 </body>
 </html>
