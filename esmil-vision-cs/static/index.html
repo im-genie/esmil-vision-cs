@@ -91,6 +91,43 @@ body{background:var(--bg);color:var(--tx);font-family:-apple-system,BlinkMacSyst
 .fpick-x{display:none;margin-left:auto;flex:0 0 auto;width:20px;height:20px;align-items:center;justify-content:center;border:none;border-radius:50%;background:transparent;color:var(--mu);cursor:pointer;font-size:12px;line-height:1;padding:0;position:relative;z-index:2}
 .fpick.has-file .fpick-x{display:flex}
 .fpick-x:hover{background:var(--rdd);color:var(--rd)}
+/* ── NSYS Pending List ── */
+.pstat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:14px 20px 4px}
+.pstat{background:var(--s2);border:1px solid var(--bd);border-radius:var(--rs);padding:10px 12px;border-left:3px solid var(--dm)}
+.pstat .pn{font-size:20px;font-weight:800;line-height:1.2}
+.pstat .pl{font-size:10.5px;font-weight:600;color:var(--mu);text-transform:uppercase;letter-spacing:.5px;margin-top:2px}
+.pstat .pp{font-size:10.5px;color:var(--dm);margin-top:1px}
+.pstat.s-total{border-left-color:var(--bl)}.pstat.s-on{border-left-color:var(--rd)}.pstat.s-on .pn{color:var(--rd)}
+.pstat.s-mon{border-left-color:var(--or)}.pstat.s-mon .pn{color:var(--or)}
+.pstat.s-done{border-left-color:var(--gn)}.pstat.s-done .pn{color:var(--gn)}
+.pfilter{display:flex;gap:8px;flex-wrap:wrap;padding:12px 20px;border-bottom:1px solid var(--b2)}
+.pfilter select{width:auto;background:var(--s2);color:var(--tx);border:1px solid var(--bd);border-radius:var(--rs);padding:6px 8px;font-size:12px;outline:none}
+.pfilter input{flex:1;min-width:140px;background:var(--s2);color:var(--tx);border:1px solid var(--bd);border-radius:var(--rs);padding:6px 10px;font-size:12px;outline:none}
+.pfilter input:focus,.pfilter select:focus{border-color:var(--bl)}
+.prow{border:1px solid var(--b2);border-radius:var(--rs);margin-bottom:8px;transition:border-color .15s}
+.prow:hover{border-color:var(--bd)}
+.prow-h{display:flex;align-items:center;gap:7px;flex-wrap:wrap;padding:9px 12px;cursor:pointer}
+.prow-desc{flex:1 1 100%;padding:0 12px 9px;font-size:13px;line-height:1.5;color:var(--tx);cursor:pointer;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.prow.open .prow-desc{display:block;-webkit-line-clamp:unset}
+.prow-meta{display:flex;gap:12px;flex-wrap:wrap;padding:0 12px 9px;font-size:11px;color:var(--mu)}
+.prow-detail{border-top:1px dashed var(--b2);margin:0 12px;padding:10px 0;font-size:12.5px;line-height:1.6;color:var(--mu);white-space:pre-wrap;word-break:break-word}
+.prow-detail b{color:var(--tx)}
+.prow-atts{display:flex;gap:6px;flex-wrap:wrap;padding:0 12px 10px}
+.patt{display:inline-flex;align-items:center;gap:5px;background:var(--s2);border:1px solid var(--bd);border-radius:20px;padding:3px 10px;font-size:11px;color:var(--bl);cursor:pointer;max-width:230px}
+.patt span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.patt:hover{border-color:var(--bl)}
+.patt .px{color:var(--mu);cursor:pointer;font-size:12px;line-height:1;flex-shrink:0}
+.patt .px:hover{color:var(--rd)}
+.p-chip{display:inline-block;padding:2px 9px;border-radius:20px;font-size:10.5px;font-weight:700;letter-spacing:.3px}
+.p-chip.on{background:var(--rdd);color:var(--rd)}
+.p-chip.mon{background:var(--ord);color:var(--or)}
+.p-chip.done{background:var(--gnd);color:var(--gn)}
+.p-age{display:inline-block;padding:2px 7px;border-radius:4px;font-size:10.5px;font-weight:700;background:var(--s3);color:var(--mu)}
+.p-age.warn{background:var(--ord);color:var(--or)}
+.p-age.late{background:var(--rdd);color:var(--rd)}
+.p-due-late{color:var(--rd);font-weight:700}
+.prow-btns{display:flex;gap:5px;margin-left:auto;flex-shrink:0}
+@media (max-width:700px){.pstat-grid{grid-template-columns:repeat(2,1fr);gap:8px;padding:12px 14px 2px}.pfilter{padding:10px 14px}.pfilter select{flex:1 1 calc(50% - 4px)}.pfilter input{flex:1 1 100%}.prow-btns{margin-left:0;flex:1 1 100%;justify-content:flex-end}}
 .mcat-hdr{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;margin:16px 0 6px}
 .mcat-hdr:first-child{margin-top:0}
 .mcat-hdr .dot{width:8px;height:8px;border-radius:50%}
@@ -930,6 +967,52 @@ function showPage(name,btn){
     </div>
   </div>
 
+  <!-- NSYS Pending List -->
+  <div class="card">
+    <div class="ch">
+      <div class="ct">&#128295; NSYS Pending List</div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <button class="btn btn-xs btn-g" onclick="exportPendingExcel()" title="Excel 다운로드">&#128229; Excel</button>
+        <button class="btn btn-xs btn-p" onclick="openPendingModal(null)">&#65291; 이슈 등록</button>
+        <span class="tag t-rd" id="pending-count">0</span>
+      </div>
+    </div>
+    <div class="pstat-grid" id="pending-stats"></div>
+    <div style="padding:6px 20px 0">
+      <div class="pbar" style="height:5px"><div class="pfil" id="pending-bar" style="width:0%;background:var(--gn)"></div></div>
+    </div>
+    <div class="pfilter">
+      <select id="pf-proc" onchange="renderPending()">
+        <option value="">공정 전체</option><option>COT</option><option>RP</option><option value="공통">공통</option>
+      </select>
+      <select id="pf-pol" onchange="renderPending()">
+        <option value="">A/C 전체</option><option value="C">Cathode</option><option value="A">Anode</option><option value="공통">공통</option>
+      </select>
+      <select id="pf-vis" onchange="renderPending()"><option value="">Vision 전체</option></select>
+      <select id="pf-status" onchange="renderPending()">
+        <option value="">상태 전체</option><option value="ongoing">진행중</option><option value="monitoring">모니터링</option>
+      </select>
+      <input type="text" id="pf-search" placeholder="검색 (내용·담당자·No...)" oninput="renderPending()">
+    </div>
+    <div class="cb" style="padding:12px 20px 14px">
+      <div id="pending-list"></div>
+    </div>
+  </div>
+
+  <!-- Pending History -->
+  <div class="card">
+    <div class="ch" onclick="togglePendingHistory()" style="cursor:pointer">
+      <div class="ct">&#128190; Pending History <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--dm)">완료된 이슈</span></div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span class="tag" style="background:var(--gnd);color:var(--gn)" id="pending-hist-count">0</span>
+        <span id="pending-hist-toggle" style="color:var(--mu);font-size:11px">&#9660;</span>
+      </div>
+    </div>
+    <div class="cb" id="pending-hist-wrap" style="padding:12px 20px 14px;display:none">
+      <div id="pending-hist-list"></div>
+    </div>
+  </div>
+
   <!-- Vision Check List -->
   <div class="card">
     <div class="ch">
@@ -950,6 +1033,65 @@ function showPage(name,btn){
         </label>
         <button class="btn btn-p" id="file-upload-btn" onclick="uploadFile()" style="flex-shrink:0;white-space:nowrap">&#11014; 업로드</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- Pending Issue 등록/수정 모달 -->
+<div id="pending-modal" style="position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:8000;display:none;align-items:center;justify-content:center;padding:20px">
+  <div style="background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);width:100%;max-width:640px;max-height:90vh;overflow-y:auto">
+    <div style="padding:14px 20px;border-bottom:1px solid var(--b2);display:flex;align-items:center;justify-content:space-between">
+      <div style="font-size:13px;font-weight:700;color:var(--tx)" id="pending-modal-title">&#128295; 이슈 등록</div>
+      <button style="background:none;border:none;color:var(--mu);font-size:20px;cursor:pointer;line-height:1" onclick="closePendingModal()">&#10005;</button>
+    </div>
+    <div style="padding:18px 20px;display:flex;flex-direction:column;gap:14px">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+        <div><label class="fl">Issue Date</label><input id="pi-date" type="date" style="width:100%"></div>
+        <div><label class="fl">Category</label>
+          <select id="pi-cat" style="width:100%"><option>SW</option><option>HW</option><option>Operation</option></select></div>
+        <div><label class="fl">담당자</label><input id="pi-assignee" type="text" style="width:100%" placeholder="이름"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+        <div><label class="fl">공정</label>
+          <select id="pi-proc" style="width:100%"><option>COT</option><option>RP</option><option value="공통">공통</option></select></div>
+        <div><label class="fl">A/C</label>
+          <select id="pi-pol" style="width:100%"><option value="C">Cathode</option><option value="A">Anode</option><option value="공통">공통</option></select></div>
+        <div><label class="fl">Vision (검사기)</label>
+          <input id="pi-vision" type="text" style="width:100%" list="vision-presets" placeholder="선택 또는 입력">
+          <datalist id="vision-presets">
+            <option>BAR TYPE</option><option>Master</option><option>Pinhole</option><option>Foil Pinhole</option>
+            <option>Rollmap</option><option>Auto Align</option><option>Overlay</option><option>Wet Align Overlay</option>
+            <option>Dry Overlay</option><option>Top Overlay</option><option>Half Cut</option><option>공통</option>
+          </datalist>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div><label class="fl">Due Date</label><input id="pi-due" type="date" style="width:100%"></div>
+        <div><label class="fl">Status</label>
+          <select id="pi-status" style="width:100%">
+            <option value="ongoing">진행중 (On-Going)</option>
+            <option value="monitoring">모니터링 (Monitoring)</option>
+            <option value="completed">완료 (Completed)</option>
+          </select></div>
+      </div>
+      <div><label class="fl">이슈 내용 (현상)</label>
+        <textarea id="pi-desc" style="width:100%;min-height:80px;resize:vertical" placeholder="- 현상 : ..."></textarea></div>
+      <div><label class="fl">조치 / 진행사항 (NSYS 답변)</label>
+        <textarea id="pi-details" style="width:100%;min-height:80px;resize:vertical" placeholder="조치 내용, 진행 상황, OEM 답변..."></textarea></div>
+      <div>
+        <label class="fl">&#128206; 첨부파일</label>
+        <div class="prow-atts" id="pi-atts" style="padding:0 0 8px"></div>
+        <label class="fpick" style="max-width:100%">
+          <input type="file" id="pi-file-input" multiple onchange="onPendingFilesPick(this)">
+          <span style="font-size:15px">&#128206;</span>
+          <span class="fpick-txt"><b>파일 선택</b> 또는 드래그 (여러 개 가능)</span>
+        </label>
+      </div>
+    </div>
+    <div style="padding:12px 20px 16px;border-top:1px solid var(--b2);display:flex;justify-content:flex-end;gap:8px;align-items:center">
+      <span id="pi-progress" style="font-size:12px;color:var(--mu);margin-right:auto"></span>
+      <button class="btn btn-g" onclick="closePendingModal()">취소</button>
+      <button class="btn btn-p" id="pi-save-btn" onclick="savePendingIssue()">&#10003; 저장</button>
     </div>
   </div>
 </div>
@@ -3013,6 +3155,25 @@ function cancelPick(ev, inputId, txtId) {
   resetFilePick(inputId, txtId);
 }
 
+// 서명 URL로 스토리지에 직접 PUT (진행률 표시를 위해 XHR 사용)
+function xhrPut(url, file, ct, onProgress) {
+  return new Promise(function(resolve, reject) {
+    var xhr = new XMLHttpRequest();
+    xhr.open('PUT', url);
+    xhr.setRequestHeader('Content-Type', ct);
+    xhr.upload.onprogress = function(e) {
+      if (onProgress && e.lengthComputable) onProgress(Math.round(e.loaded / e.total * 100));
+    };
+    xhr.onload = function() {
+      (xhr.status >= 200 && xhr.status < 300)
+        ? resolve()
+        : reject(new Error('스토리지 업로드 실패 (HTTP ' + xhr.status + ')'));
+    };
+    xhr.onerror = function() { reject(new Error('스토리지 연결 실패 (네트워크/CORS)')); };
+    xhr.send(file);
+  });
+}
+
 // Vercel 함수는 요청 본문이 4.5MB로 제한되어(413) 파일을 서명 URL로
 // Firebase Storage에 직접 올린 뒤, 메타데이터만 API에 등록한다.
 async function directUpload(apiBase, file, meta, onProgress) {
@@ -3028,22 +3189,8 @@ async function directUpload(apiBase, file, meta, onProgress) {
   if (!r.ok) throw new Error('업로드 URL 발급 실패 (HTTP ' + r.status + ')');
   var d = await r.json();
 
-  // 2) 스토리지로 직접 PUT (진행률 표시를 위해 XHR 사용)
-  await new Promise(function(resolve, reject) {
-    var xhr = new XMLHttpRequest();
-    xhr.open('PUT', d.uploadUrl);
-    xhr.setRequestHeader('Content-Type', ct);
-    xhr.upload.onprogress = function(e) {
-      if (onProgress && e.lengthComputable) onProgress(Math.round(e.loaded / e.total * 100));
-    };
-    xhr.onload = function() {
-      (xhr.status >= 200 && xhr.status < 300)
-        ? resolve()
-        : reject(new Error('스토리지 업로드 실패 (HTTP ' + xhr.status + ')'));
-    };
-    xhr.onerror = function() { reject(new Error('스토리지 연결 실패 (네트워크/CORS)')); };
-    xhr.send(file);
-  });
+  // 2) 스토리지로 직접 PUT
+  await xhrPut(d.uploadUrl, file, ct, onProgress);
 
   // 3) 메타데이터 등록
   var r2 = await fetch(apiBase + '/register', {
@@ -3518,6 +3665,415 @@ function renderAudit() {
 // PAGE 전환 & 초기화
 // ════════════════════════════════════════════════════════════════════════
 
+// ════════════════════════════════════════════════════════════════════════
+// NSYS PENDING LIST
+// ════════════════════════════════════════════════════════════════════════
+
+var pendingIssues = [];
+var pendingOpen = {};       // 행 펼침 상태
+var pendingEditId = null;
+var pendingKeptAtts = [];   // 수정 시 유지할 기존 첨부
+var pendingNewFiles = [];   // 새로 선택한 File 객체
+
+var P_STATUS = { ongoing: ['진행중', 'on'], monitoring: ['모니터링', 'mon'], completed: ['완료', 'done'] };
+
+async function loadPending() {
+  var token = localStorage.getItem('ws_token') || '';
+  try {
+    var r = await fetch('/api/pending', { headers: { 'Authorization': 'Bearer ' + token } });
+    if (r.ok) {
+      pendingIssues = (await r.json()).issues || [];
+      buildPendingVisionFilter();
+      renderPending();
+    }
+  } catch(e) {
+    console.error('Pending error:', e);
+  }
+}
+
+function buildPendingVisionFilter() {
+  var sel = document.getElementById('pf-vis');
+  if (!sel) return;
+  var cur = sel.value;
+  var seen = {};
+  pendingIssues.forEach(function(p) { if (p.vision) seen[p.vision] = 1; });
+  sel.innerHTML = '<option value="">Vision 전체</option>' + Object.keys(seen).sort().map(function(v) {
+    return '<option' + (v === cur ? ' selected' : '') + '>' + esc(v) + '</option>';
+  }).join('');
+}
+
+// 발행 후 경과일 (오늘 - issueDate)
+function pendingAge(p) {
+  if (!p.issueDate) return null;
+  var d = new Date(p.issueDate + 'T00:00:00');
+  if (isNaN(d)) return null;
+  return Math.max(0, Math.floor((Date.now() - d.getTime()) / 86400000));
+}
+
+function pendingDueLate(p) {
+  if (!p.dueDate || p.status === 'completed') return false;
+  return p.dueDate < getDateString(new Date());
+}
+
+function pShort(s) { return s ? String(s).slice(2, 10) : '-'; }  // 2025-11-24 → 25-11-24
+
+function pendingFilters() {
+  return {
+    proc: document.getElementById('pf-proc').value,
+    pol: document.getElementById('pf-pol').value,
+    vis: document.getElementById('pf-vis').value,
+    status: document.getElementById('pf-status').value,
+    q: document.getElementById('pf-search').value.trim().toLowerCase()
+  };
+}
+
+function pendingMatch(p, f) {
+  if (f.proc && p.process !== f.proc) return false;
+  if (f.pol && p.polarity !== f.pol) return false;
+  if (f.vis && p.vision !== f.vis) return false;
+  if (f.status && p.status !== f.status) return false;
+  if (f.q) {
+    var hay = [p.issueNo, p.description, p.details, p.vision, p.assignee, p.category].join(' ').toLowerCase();
+    if (hay.indexOf(f.q) === -1) return false;
+  }
+  return true;
+}
+
+function procTag(v) {
+  if (v === 'COT') return '<span class="tag t-ct">COT</span>';
+  if (v === 'RP') return '<span class="tag t-rp">RP</span>';
+  return '<span class="tag t-gy">' + esc(v || '-') + '</span>';
+}
+function polTag(v) {
+  if (v === 'C') return '<span class="tag t-ca-c">C</span>';
+  if (v === 'A') return '<span class="tag t-ca-a">A</span>';
+  return '<span class="tag t-gy">' + esc(v || '-') + '</span>';
+}
+
+function pendingRow(p, isHist) {
+  var st = P_STATUS[p.status] || [p.status, 'on'];
+  var open = pendingOpen[p.id];
+  var h = '';
+
+  // ── 헤더 라인: 상태칩 · No · 태그들 · 경과일 · 버튼 ──
+  h += '<div class="prow' + (open ? ' open' : '') + '" id="prow-' + p.id + '">';
+  h += '<div class="prow-h" onclick="togglePendingRow(\'' + p.id + '\')">';
+  h += '<span class="p-chip ' + st[1] + '">' + st[0] + '</span>';
+  h += '<span style="font-size:11px;font-weight:700;color:var(--dm)">#' + esc(p.issueNo) + '</span>';
+  h += procTag(p.process) + polTag(p.polarity);
+  if (p.vision) h += '<span class="tag t-cy">' + esc(p.vision) + '</span>';
+  if (p.category) h += '<span class="tag t-bl">' + esc(p.category) + '</span>';
+  if (!isHist) {
+    var age = pendingAge(p);
+    if (age !== null) {
+      var cls = age > 30 ? ' late' : (age >= 7 ? ' warn' : '');
+      h += '<span class="p-age' + cls + '" title="발행 후 경과일">D+' + age + '</span>';
+    }
+  }
+  h += '<div class="prow-btns" onclick="event.stopPropagation()">';
+  h += '<button class="btn btn-xs btn-g" onclick="openPendingModal(\'' + p.id + '\')">수정</button>';
+  if (isHist) {
+    h += '<button class="btn btn-xs btn-g" onclick="quickPendingStatus(\'' + p.id + '\',\'ongoing\')" title="진행중으로 되돌리기">&#8634; 재오픈</button>';
+  } else {
+    h += '<button class="btn btn-xs btn-p" onclick="quickPendingStatus(\'' + p.id + '\',\'completed\')">&#10003; 완료</button>';
+  }
+  if (isAdminUser()) h += '<button class="btn btn-xs btn-d" onclick="deletePending(\'' + p.id + '\')">삭제</button>';
+  h += '</div></div>';
+
+  // ── 내용 ──
+  h += '<div class="prow-desc" onclick="togglePendingRow(\'' + p.id + '\')">' + esc(p.description) + '</div>';
+
+  // ── 메타 ──
+  var due = p.dueDate
+    ? '<span' + (pendingDueLate(p) ? ' class="p-due-late" title="기한 초과"' : '') + '>기한 ' + pShort(p.dueDate) + (pendingDueLate(p) ? ' &#9888;' : '') + '</span>'
+    : '';
+  h += '<div class="prow-meta">';
+  h += '<span>발행 ' + pShort(p.issueDate) + '</span>';
+  if (due) h += due;
+  if (p.assignee) h += '<span>담당 ' + esc(p.assignee) + '</span>';
+  if (isHist && p.completedAt) h += '<span style="color:var(--gn)">&#10003; 완료 ' + fmtWhen(p.completedAt) + '</span>';
+  if (p.updatedAt) h += '<span>업데이트 ' + fmtWhen(p.updatedAt) + (p.updatedBy && p.updatedBy !== 'excel-import' ? ' (' + esc(p.updatedBy) + ')' : '') + '</span>';
+  if ((p.attachments || []).length) h += '<span>&#128206; ' + p.attachments.length + '</span>';
+  h += '</div>';
+
+  // ── 펼침: 조치/진행사항 + 첨부 ──
+  if (open) {
+    if (p.details) h += '<div class="prow-detail"><b>조치 / 진행사항</b>\n' + esc(p.details) + '</div>';
+    if ((p.attachments || []).length) {
+      h += '<div class="prow-atts">' + p.attachments.map(function(a, i) {
+        return '<span class="patt" onclick="event.stopPropagation();openPendingFile(\'' + p.id + '\',' + i + ')" title="' + escAttr(a.name) + '">'
+          + '&#128206;<span>' + esc(a.name) + '</span><span style="color:var(--dm)">' + fmtSize(a.size) + '</span></span>';
+      }).join('') + '</div>';
+    }
+  }
+  h += '</div>';
+  return h;
+}
+
+function renderPending() {
+  var listEl = document.getElementById('pending-list');
+  if (!listEl) return;
+  var f = pendingFilters();
+
+  // ── 요약 통계 (전체 기준, 엑셀 상단 요약과 동일) ──
+  var total = pendingIssues.length;
+  var cnt = { ongoing: 0, monitoring: 0, completed: 0 };
+  pendingIssues.forEach(function(p) { if (cnt[p.status] !== undefined) cnt[p.status]++; });
+  var pct = function(n) { return total ? Math.round(n / total * 100) + '%' : '0%'; };
+  document.getElementById('pending-stats').innerHTML =
+      '<div class="pstat s-total"><div class="pn">' + total + '</div><div class="pl">Total</div><div class="pp">&nbsp;</div></div>'
+    + '<div class="pstat s-on"><div class="pn">' + cnt.ongoing + '</div><div class="pl">진행중</div><div class="pp">' + pct(cnt.ongoing) + '</div></div>'
+    + '<div class="pstat s-mon"><div class="pn">' + cnt.monitoring + '</div><div class="pl">모니터링</div><div class="pp">' + pct(cnt.monitoring) + '</div></div>'
+    + '<div class="pstat s-done"><div class="pn">' + cnt.completed + '</div><div class="pl">완료</div><div class="pp">' + pct(cnt.completed) + '</div></div>';
+  document.getElementById('pending-bar').style.width = total ? Math.round(cnt.completed / total * 100) + '%' : '0%';
+
+  // ── 진행중 리스트 (완료 제외 + 필터) ──
+  var active = pendingIssues.filter(function(p) { return p.status !== 'completed'; });
+  document.getElementById('pending-count').textContent = active.length;
+  var shown = active.filter(function(p) { return pendingMatch(p, f); });
+  shown.sort(function(a, b) {
+    return (b.issueDate || '').localeCompare(a.issueDate || '') || (b.issueNo || 0) - (a.issueNo || 0);
+  });
+  listEl.innerHTML = shown.length
+    ? shown.map(function(p) { return pendingRow(p, false); }).join('')
+    : '<div class="empty" style="padding:18px 0"><div class="ei">&#127881;</div><div class="et">'
+      + (active.length ? '필터에 맞는 이슈가 없습니다' : '진행중인 이슈가 없습니다') + '</div></div>';
+
+  // ── 히스토리 (완료) ──
+  var hist = pendingIssues.filter(function(p) { return p.status === 'completed'; });
+  document.getElementById('pending-hist-count').textContent = hist.length;
+  hist.sort(function(a, b) {
+    return String(b.completedAt || b.updatedAt || '').localeCompare(String(a.completedAt || a.updatedAt || ''))
+      || (b.issueNo || 0) - (a.issueNo || 0);
+  });
+  document.getElementById('pending-hist-list').innerHTML = hist.length
+    ? hist.map(function(p) { return pendingRow(p, true); }).join('')
+    : '<div class="empty" style="padding:14px 0"><div class="et">완료된 이슈가 없습니다</div></div>';
+}
+
+function togglePendingRow(id) {
+  pendingOpen[id] = !pendingOpen[id];
+  renderPending();
+}
+
+function togglePendingHistory() {
+  var el = document.getElementById('pending-hist-wrap');
+  var toggle = document.getElementById('pending-hist-toggle');
+  var show = el.style.display === 'none';
+  el.style.display = show ? 'block' : 'none';
+  toggle.innerHTML = show ? '&#9650;' : '&#9660;';
+}
+
+// ── 상태 빠른 변경 / 삭제 ──
+async function quickPendingStatus(id, status) {
+  var token = localStorage.getItem('ws_token') || '';
+  try {
+    var r = await fetch('/api/pending/' + id, {
+      method: 'PUT',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: status })
+    });
+    if (r.ok) {
+      await loadPending();
+      toast(status === 'completed' ? '완료 처리 → Pending History로 이동 ✓' : '재오픈 ✓');
+    } else {
+      alert('변경 실패: ' + r.status);
+    }
+  } catch(e) {
+    alert('오류: ' + e.message);
+  }
+}
+
+async function deletePending(id) {
+  if (!confirm('이 이슈를 삭제하시겠습니까? 첨부파일도 함께 삭제됩니다.')) return;
+  var token = localStorage.getItem('ws_token') || '';
+  try {
+    var r = await fetch('/api/pending/' + id, {
+      method: 'DELETE',
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    if (r.ok) { await loadPending(); toast('이슈 삭제됨'); }
+    else alert('삭제 실패: ' + r.status);
+  } catch(e) {
+    alert('오류: ' + e.message);
+  }
+}
+
+// ── 첨부파일 열기 (서명 URL) ──
+async function openPendingFile(issueId, attIndex) {
+  var p = pendingIssues.find(function(x) { return x.id === issueId; });
+  var att = p && (p.attachments || [])[attIndex];
+  if (!att) return;
+  var token = localStorage.getItem('ws_token') || '';
+  try {
+    var r = await fetch('/api/pending/' + issueId + '/file-url?path=' + encodeURIComponent(att.path),
+                        { headers: { 'Authorization': 'Bearer ' + token } });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    window.open((await r.json()).url, '_blank');
+  } catch(e) {
+    alert('파일 열기 실패: ' + e.message);
+  }
+}
+
+// ── 등록/수정 모달 ──
+function openPendingModal(id) {
+  pendingEditId = id;
+  pendingNewFiles = [];
+  var p = id ? pendingIssues.find(function(x) { return x.id === id; }) : null;
+  pendingKeptAtts = p ? (p.attachments || []).slice() : [];
+  document.getElementById('pending-modal-title').innerHTML = p
+    ? '&#9999;&#65039; 이슈 수정 <span style="color:var(--dm)">#' + esc(p.issueNo) + '</span>'
+    : '&#128295; 이슈 등록';
+  document.getElementById('pi-date').value = p ? (p.issueDate || '') : getDateString(new Date());
+  document.getElementById('pi-cat').value = p ? (p.category || 'SW') : 'SW';
+  document.getElementById('pi-assignee').value = p ? (p.assignee || '') : '';
+  document.getElementById('pi-proc').value = p ? (p.process || 'COT') : 'COT';
+  document.getElementById('pi-pol').value = p ? (p.polarity || 'C') : 'C';
+  document.getElementById('pi-vision').value = p ? (p.vision || '') : '';
+  document.getElementById('pi-due').value = p ? (p.dueDate || '') : '';
+  document.getElementById('pi-status').value = p ? (p.status || 'ongoing') : 'ongoing';
+  document.getElementById('pi-desc').value = p ? (p.description || '') : '';
+  document.getElementById('pi-details').value = p ? (p.details || '') : '';
+  document.getElementById('pi-progress').textContent = '';
+  renderPendingModalAtts();
+  document.getElementById('pending-modal').style.display = 'flex';
+}
+
+function closePendingModal() {
+  pendingEditId = null;
+  pendingNewFiles = [];
+  pendingKeptAtts = [];
+  document.getElementById('pending-modal').style.display = 'none';
+}
+
+function onPendingFilesPick(inp) {
+  for (var i = 0; i < inp.files.length; i++) pendingNewFiles.push(inp.files[i]);
+  inp.value = '';
+  renderPendingModalAtts();
+}
+
+function removePendingAtt(kind, idx) {
+  if (kind === 'kept') pendingKeptAtts.splice(idx, 1);
+  else pendingNewFiles.splice(idx, 1);
+  renderPendingModalAtts();
+}
+
+function renderPendingModalAtts() {
+  var h = pendingKeptAtts.map(function(a, i) {
+    return '<span class="patt">&#128206;<span>' + esc(a.name) + '</span><span style="color:var(--dm)">' + fmtSize(a.size) + '</span>'
+      + '<span class="px" onclick="removePendingAtt(\'kept\',' + i + ')" title="첨부 제거">&#10005;</span></span>';
+  }).join('');
+  h += pendingNewFiles.map(function(f, i) {
+    return '<span class="patt" style="border-style:dashed">&#128228;<span>' + esc(f.name) + '</span><span style="color:var(--dm)">' + fmtSize(f.size) + '</span>'
+      + '<span class="px" onclick="removePendingAtt(\'new\',' + i + ')" title="선택 취소">&#10005;</span></span>';
+  }).join('');
+  document.getElementById('pi-atts').innerHTML = h || '<span style="font-size:11.5px;color:var(--dm)">첨부 없음</span>';
+}
+
+// 이슈 첨부파일 1개 직접 업로드 (서명 URL)
+async function pendingUploadFile(file, onPct) {
+  var token = localStorage.getItem('ws_token') || '';
+  var ct = file.type || 'application/octet-stream';
+  var r = await fetch('/api/pending/upload-url', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fileName: file.name, contentType: ct })
+  });
+  if (!r.ok) throw new Error('업로드 URL 발급 실패 (HTTP ' + r.status + ')');
+  var d = await r.json();
+  await xhrPut(d.uploadUrl, file, ct, onPct);
+  return { name: file.name, path: d.blobPath, size: file.size };
+}
+
+async function savePendingIssue() {
+  var desc = document.getElementById('pi-desc').value.trim();
+  if (!desc) { alert('이슈 내용을 입력하세요'); return; }
+
+  var btn = document.getElementById('pi-save-btn');
+  var prog = document.getElementById('pi-progress');
+  btn.disabled = true;
+  try {
+    // 1) 새 첨부파일 업로드
+    var atts = pendingKeptAtts.slice();
+    for (var i = 0; i < pendingNewFiles.length; i++) {
+      var f = pendingNewFiles[i];
+      var label = '첨부 업로드 (' + (i + 1) + '/' + pendingNewFiles.length + ') ';
+      atts.push(await pendingUploadFile(f, function(pct) { prog.textContent = label + pct + '%'; }));
+    }
+    prog.textContent = '저장 중...';
+
+    // 2) 이슈 저장
+    var payload = {
+      issueDate: document.getElementById('pi-date').value,
+      category: document.getElementById('pi-cat').value,
+      assignee: document.getElementById('pi-assignee').value.trim(),
+      process: document.getElementById('pi-proc').value,
+      polarity: document.getElementById('pi-pol').value,
+      vision: document.getElementById('pi-vision').value.trim(),
+      dueDate: document.getElementById('pi-due').value,
+      status: document.getElementById('pi-status').value,
+      description: desc,
+      details: document.getElementById('pi-details').value.trim(),
+      attachments: atts
+    };
+    var token = localStorage.getItem('ws_token') || '';
+    var r = await fetch(pendingEditId ? '/api/pending/' + pendingEditId : '/api/pending', {
+      method: pendingEditId ? 'PUT' : 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    closePendingModal();
+    await loadPending();
+    toast(pendingEditId ? '이슈 수정 완료 ✓' : '이슈 등록 완료 ✓');
+  } catch(e) {
+    prog.textContent = '';
+    alert('저장 실패: ' + e.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ── Excel 내보내기 (원본 엑셀과 동일한 컬럼 구성) ──
+function loadSheetJS() {
+  return new Promise(function(resolve, reject) {
+    if (window.XLSX) return resolve();
+    var s = document.createElement('script');
+    s.src = 'https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js';
+    s.onload = resolve;
+    s.onerror = function() { reject(new Error('Excel 라이브러리 로드 실패 (인터넷 연결 확인)')); };
+    document.head.appendChild(s);
+  });
+}
+
+async function exportPendingExcel() {
+  if (!pendingIssues.length) { alert('내보낼 이슈가 없습니다'); return; }
+  try {
+    await loadSheetJS();
+    var stTxt = { ongoing: 'ongoing', monitoring: 'monitoring', completed: 'completed' };
+    var rows = pendingIssues.slice().sort(function(a, b) { return (a.issueNo || 0) - (b.issueNo || 0); })
+      .map(function(p) {
+        return {
+          'No': p.issueNo, 'Issued Date': p.issueDate, 'Category': p.category,
+          'Process': p.process, 'Polarity': p.polarity, 'Vision': p.vision,
+          'Content (KOR)': p.description, 'Details (KOR)': p.details,
+          'Person in Charge': p.assignee, 'Due Date': p.dueDate,
+          'Status': stTxt[p.status] || p.status,
+          'Update Date': p.updatedAt ? String(p.updatedAt).slice(0, 10) : ''
+        };
+      });
+    var ws = XLSX.utils.json_to_sheet(rows);
+    ws['!cols'] = [{wch:5},{wch:11},{wch:9},{wch:8},{wch:8},{wch:14},{wch:50},{wch:50},{wch:14},{wch:11},{wch:11},{wch:11}];
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'JF2 N-SYS Pending');
+    var d = new Date();
+    var stamp = String(d.getFullYear()).slice(2) + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0');
+    XLSX.writeFile(wb, 'ESMIL_JF2_Vision_Pending_List_' + stamp + '.xlsx');
+  } catch(e) {
+    alert('내보내기 실패: ' + e.message);
+  }
+}
+
 var _originalShowPage = window.showPage;
 window.showPage = function(name, btn) {
   document.querySelectorAll('.page').forEach(function(p) {
@@ -3534,6 +4090,7 @@ window.showPage = function(name, btn) {
   if (name === 'tasks') {
     loadTasks();
     loadFiles();
+    loadPending();
   } else if (name === 'manual') {
     loadManuals();
   } else if (name === 'admin') {
@@ -3549,6 +4106,7 @@ syncManualSubcats();
 setTimeout(function() {
   loadTasks();
   loadFiles();
+  loadPending();
   loadManuals();
 }, 1000);
 </script>

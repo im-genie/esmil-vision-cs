@@ -586,6 +586,170 @@ async def delete_task(task_id: str, u: str = Depends(current_user)):
     return JSONResponse({"success": True})
 
 # ════════════════════════════════════════════════════════════════════════
+# PENDING ISSUES (Tasks 탭 내 NSYS Pending List)
+# ════════════════════════════════════════════════════════════════════════
+
+PENDING_STATUSES = {"ongoing", "monitoring", "completed"}
+
+def _clean_attachments(raw) -> list:
+    """첨부 목록 정규화: pending_files/ 경로만 허용."""
+    out = []
+    for a in (raw or []):
+        if not isinstance(a, dict):
+            continue
+        path = str(a.get("path") or "")
+        if not path.startswith("pending_files/") or ".." in path:
+            continue
+        out.append({
+            "name": str(a.get("name") or path.rsplit("_", 1)[-1]),
+            "path": path,
+            "size": int(a.get("size") or 0),
+        })
+    return out
+
+@app.get("/api/pending")
+async def get_pending_issues(u: str = Depends(current_user)):
+    """Get all pending issues (active + history)."""
+    ensure_db()
+    try:
+        docs = list(db.collection("pending_issues").stream())
+        issues = []
+        for d in docs:
+            p = d.to_dict() or {}
+            p["id"] = d.id
+            issues.append(serialize(p))
+        return JSONResponse({"issues": issues})
+    except Exception as ex:
+        raise HTTPException(500, str(ex))
+
+@app.post("/api/pending")
+async def create_pending_issue(payload: dict, u: str = Depends(current_user)):
+    """Create a pending issue (all roles with write)."""
+    require(u, "write")
+    ensure_db()
+    status = str(payload.get("status") or "ongoing").lower()
+    if status not in PENDING_STATUSES:
+        status = "ongoing"
+    # 이슈 번호: 현재 최댓값 + 1
+    last = list(db.collection("pending_issues")
+                .order_by("issueNo", direction=firestore.Query.DESCENDING).limit(1).stream())
+    next_no = ((last[0].to_dict() or {}).get("issueNo") or 0) + 1 if last else 1
+    issue = {
+        "issueNo": next_no,
+        "issueDate": str(payload.get("issueDate") or date.today().isoformat()),
+        "category": str(payload.get("category") or "SW"),
+        "process": str(payload.get("process") or "공통"),
+        "polarity": str(payload.get("polarity") or "공통"),
+        "vision": str(payload.get("vision") or ""),
+        "description": str(payload.get("description") or ""),
+        "details": str(payload.get("details") or ""),
+        "assignee": str(payload.get("assignee") or ""),
+        "dueDate": str(payload.get("dueDate") or ""),
+        "status": status,
+        "attachments": _clean_attachments(payload.get("attachments")),
+        "createdBy": u,
+        "createdAt": firestore.SERVER_TIMESTAMP,
+        "updatedAt": firestore.SERVER_TIMESTAMP,
+        "updatedBy": u,
+    }
+    if status == "completed":
+        issue["completedAt"] = datetime.utcnow().isoformat() + "Z"
+    ref = db.collection("pending_issues").document()
+    ref.set(issue)
+    audit_log(u, "pending_create", ref.id, f"#{next_no} {issue['description'][:60]}")
+    return JSONResponse({"id": ref.id, "success": True, "issueNo": next_no})
+
+@app.put("/api/pending/{issue_id}")
+async def update_pending_issue(issue_id: str, payload: dict, u: str = Depends(current_user)):
+    """Update a pending issue. updatedAt은 자동 갱신."""
+    require(u, "write")
+    ensure_db()
+    doc = db.collection("pending_issues").document(issue_id).get()
+    if not doc.exists:
+        raise HTTPException(404, "Issue not found")
+    prev = doc.to_dict() or {}
+
+    allowed = {"issueDate", "category", "process", "polarity", "vision", "description",
+               "details", "assignee", "dueDate", "status", "attachments"}
+    data = {k: v for k, v in payload.items() if k in allowed}
+    if "status" in data:
+        data["status"] = str(data["status"]).lower()
+        if data["status"] not in PENDING_STATUSES:
+            raise HTTPException(400, "Invalid status")
+        # 완료 전환/해제 시각 기록
+        if data["status"] == "completed" and prev.get("status") != "completed":
+            data["completedAt"] = datetime.utcnow().isoformat() + "Z"
+        elif data["status"] != "completed" and prev.get("status") == "completed":
+            data["completedAt"] = firestore.DELETE_FIELD
+    if "attachments" in data:
+        data["attachments"] = _clean_attachments(data["attachments"])
+        # 제거된 첨부는 스토리지에서도 삭제
+        kept = {a["path"] for a in data["attachments"]}
+        for a in (prev.get("attachments") or []):
+            if a.get("path") and a["path"] not in kept:
+                try:
+                    bucket.blob(a["path"]).delete()
+                except Exception as e:
+                    print(f"[Pending] attachment delete failed: {e}")
+    data["updatedAt"] = firestore.SERVER_TIMESTAMP
+    data["updatedBy"] = u
+    db.collection("pending_issues").document(issue_id).update(data)
+    audit_log(u, "pending_update", issue_id,
+              f"#{prev.get('issueNo', '?')} " + (", ".join(sorted(set(data) - {"updatedAt", "updatedBy"}))))
+    return JSONResponse({"success": True})
+
+@app.delete("/api/pending/{issue_id}")
+async def delete_pending_issue(issue_id: str, u: str = Depends(current_user)):
+    """Delete a pending issue (admin only). 첨부파일도 함께 삭제."""
+    require(u, "delete")
+    ensure_db()
+    doc = db.collection("pending_issues").document(issue_id).get()
+    if not doc.exists:
+        raise HTTPException(404, "Issue not found")
+    p = doc.to_dict() or {}
+    for a in (p.get("attachments") or []):
+        if a.get("path"):
+            try:
+                bucket.blob(a["path"]).delete()
+            except Exception as e:
+                print(f"[Pending] attachment delete failed: {e}")
+    db.collection("pending_issues").document(issue_id).delete()
+    audit_log(u, "pending_delete", issue_id, f"#{p.get('issueNo', '?')} {str(p.get('description', ''))[:60]}")
+    return JSONResponse({"success": True})
+
+@app.post("/api/pending/upload-url")
+async def pending_upload_url(payload: dict = Body(...), u: str = Depends(current_user)):
+    """이슈 첨부파일 직접 업로드용 서명 URL 발급."""
+    require(u, "write")
+    ensure_db()
+    file_name = str(payload.get("fileName") or "").strip()
+    if not file_name:
+        raise HTTPException(400, "fileName is required")
+    try:
+        url, blob_path = _make_upload_url("pending_files", file_name, str(payload.get("contentType") or ""))
+        return JSONResponse({"uploadUrl": url, "blobPath": blob_path})
+    except Exception as ex:
+        raise HTTPException(500, f"Signed URL failed: {ex}")
+
+@app.get("/api/pending/{issue_id}/file-url")
+async def pending_file_url(issue_id: str, path: str, u: str = Depends(current_user)):
+    """이슈 첨부파일 다운로드용 임시 서명 URL (해당 이슈에 등록된 파일만)."""
+    ensure_db()
+    doc = db.collection("pending_issues").document(issue_id).get()
+    if not doc.exists:
+        raise HTTPException(404, "Issue not found")
+    atts = (doc.to_dict() or {}).get("attachments") or []
+    if path not in {a.get("path") for a in atts}:
+        raise HTTPException(404, "Attachment not found on this issue")
+    blob = bucket.blob(path)
+    if not blob.exists():
+        raise HTTPException(404, "File not found in storage")
+    try:
+        return JSONResponse({"url": _signed_preview_url(blob)})
+    except Exception as ex:
+        raise HTTPException(500, f"Signed URL failed: {ex}")
+
+# ════════════════════════════════════════════════════════════════════════
 # TEAM FILES (Tasks 탭 내 팀 파일 섹션)
 # ════════════════════════════════════════════════════════════════════════
 
