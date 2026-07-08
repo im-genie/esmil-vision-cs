@@ -4059,7 +4059,10 @@ async function exportPendingExcel() {
           'Content (KOR)': p.description, 'Details (KOR)': p.details,
           'Person in Charge': p.assignee, 'Due Date': p.dueDate,
           'Status': stTxt[p.status] || p.status,
-          'Update Date': p.updatedAt ? String(p.updatedAt).slice(0, 10) : ''
+          'Update Date': (function() {
+            var d = new Date(p.updatedAt);
+            return p.updatedAt && !isNaN(d) ? getDateString(d) : '';
+          })()
         };
       });
     var ws = XLSX.utils.json_to_sheet(rows);
