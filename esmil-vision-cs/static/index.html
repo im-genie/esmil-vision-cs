@@ -88,6 +88,9 @@ body{background:var(--bg);color:var(--tx);font-family:-apple-system,BlinkMacSyst
 .fpick-txt{font-size:12.5px;color:var(--mu);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;pointer-events:none}
 .fpick-txt b{color:var(--bl);font-weight:600}
 .fpick.has-file .fpick-txt{color:var(--tx)}
+.fpick-x{display:none;margin-left:auto;flex:0 0 auto;width:20px;height:20px;align-items:center;justify-content:center;border:none;border-radius:50%;background:transparent;color:var(--mu);cursor:pointer;font-size:12px;line-height:1;padding:0;position:relative;z-index:2}
+.fpick.has-file .fpick-x{display:flex}
+.fpick-x:hover{background:var(--rdd);color:var(--rd)}
 .mcat-hdr{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;margin:16px 0 6px}
 .mcat-hdr:first-child{margin-top:0}
 .mcat-hdr .dot{width:8px;height:8px;border-radius:50%}
@@ -139,6 +142,7 @@ input[readonly]{color:var(--mu);cursor:default}
 .lot-drop-hdr{padding:10px 14px;background:rgba(57,211,176,.08);border-bottom:1px solid var(--b2);font-size:11px;font-weight:700;color:var(--cy);display:flex;align-items:center;justify-content:space-between}
 .lot-drop-body{padding:10px;max-height:400px;overflow-y:auto}
 .btn{padding:8px 16px;border-radius:var(--rs);border:none;cursor:pointer;font-size:13px;font-weight:600;transition:all .15s;display:inline-flex;align-items:center;gap:6px}
+.btn:disabled{opacity:.55;cursor:not-allowed}
 .btn-p{background:var(--bl);color:#fff;box-shadow:0 2px 8px rgba(56,139,253,.25)}
 .btn-p:hover{background:#58a6ff;transform:translateY(-1px)}
 .btn-p.rp{background:var(--rp);color:#0d1117}.btn-p.rp:hover{background:#6ee89a;color:#0d1117}
@@ -942,8 +946,9 @@ function showPage(name,btn){
           <input type="file" id="file-input" onchange="onFilePick(this,'file-pick-txt')">
           <span style="font-size:15px">&#128206;</span>
           <span class="fpick-txt" id="file-pick-txt"><b>파일 선택</b> 또는 드래그</span>
+          <button type="button" class="fpick-x" title="선택 취소" aria-label="선택 취소" onclick="cancelPick(event,'file-input','file-pick-txt')">&#10005;</button>
         </label>
-        <button class="btn btn-p" onclick="uploadFile()" style="flex-shrink:0;white-space:nowrap">&#11014; 업로드</button>
+        <button class="btn btn-p" id="file-upload-btn" onclick="uploadFile()" style="flex-shrink:0;white-space:nowrap">&#11014; 업로드</button>
       </div>
     </div>
   </div>
@@ -979,8 +984,9 @@ function showPage(name,btn){
               <input type="file" id="manual-input" onchange="onFilePick(this,'manual-pick-txt')">
               <span style="font-size:15px">&#128206;</span>
               <span class="fpick-txt" id="manual-pick-txt"><b>파일 선택</b> 또는 드래그</span>
+              <button type="button" class="fpick-x" title="선택 취소" aria-label="선택 취소" onclick="cancelPick(event,'manual-input','manual-pick-txt')">&#10005;</button>
             </label>
-            <button class="btn btn-p" onclick="uploadManual()" style="flex-shrink:0;white-space:nowrap">&#11014; 업로드</button>
+            <button class="btn btn-p" id="manual-upload-btn" onclick="uploadManual()" style="flex-shrink:0;white-space:nowrap">&#11014; 업로드</button>
           </div>
         </div>
       </div>
@@ -3000,6 +3006,55 @@ function resetFilePick(inputId, txtId) {
   onFilePick(inp, txtId);
 }
 
+// 선택 취소(✕) — label 안의 버튼이므로 파일 선택창이 열리지 않게 기본 동작을 막는다
+function cancelPick(ev, inputId, txtId) {
+  ev.preventDefault();
+  ev.stopPropagation();
+  resetFilePick(inputId, txtId);
+}
+
+// Vercel 함수는 요청 본문이 4.5MB로 제한되어(413) 파일을 서명 URL로
+// Firebase Storage에 직접 올린 뒤, 메타데이터만 API에 등록한다.
+async function directUpload(apiBase, file, meta, onProgress) {
+  var token = localStorage.getItem('ws_token') || '';
+  var ct = file.type || 'application/octet-stream';
+
+  // 1) 서명 URL 발급
+  var r = await fetch(apiBase + '/upload-url', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fileName: file.name, contentType: ct })
+  });
+  if (!r.ok) throw new Error('업로드 URL 발급 실패 (HTTP ' + r.status + ')');
+  var d = await r.json();
+
+  // 2) 스토리지로 직접 PUT (진행률 표시를 위해 XHR 사용)
+  await new Promise(function(resolve, reject) {
+    var xhr = new XMLHttpRequest();
+    xhr.open('PUT', d.uploadUrl);
+    xhr.setRequestHeader('Content-Type', ct);
+    xhr.upload.onprogress = function(e) {
+      if (onProgress && e.lengthComputable) onProgress(Math.round(e.loaded / e.total * 100));
+    };
+    xhr.onload = function() {
+      (xhr.status >= 200 && xhr.status < 300)
+        ? resolve()
+        : reject(new Error('스토리지 업로드 실패 (HTTP ' + xhr.status + ')'));
+    };
+    xhr.onerror = function() { reject(new Error('스토리지 연결 실패 (네트워크/CORS)')); };
+    xhr.send(file);
+  });
+
+  // 3) 메타데이터 등록
+  var r2 = await fetch(apiBase + '/register', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify(Object.assign({ blobPath: d.blobPath, originalFileName: file.name }, meta))
+  });
+  if (!r2.ok) throw new Error('파일 등록 실패 (HTTP ' + r2.status + ')');
+  return await r2.json();
+}
+
 function fileIcon(name) {
   var ext = String(name || '').split('.').pop().toLowerCase();
   if (['jpg','jpeg','png','gif','webp','bmp'].indexOf(ext) !== -1) return '&#128444;&#65039;';
@@ -3049,26 +3104,21 @@ async function uploadFile() {
     return;
   }
 
-  var token = localStorage.getItem('ws_token') || '';
-  var formData = new FormData();
-  formData.append('file', file);
-  formData.append('fileName', file.name.split('.')[0]);
-
+  var btn = document.getElementById('file-upload-btn');
+  var txt = document.getElementById('file-pick-txt');
+  btn.disabled = true;
   try {
-    var r = await fetch('/api/team-files/upload', {
-      method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + token },
-      body: formData
-    });
-
-    if (r.ok) {
-      resetFilePick('file-input', 'file-pick-txt');
-      await loadFiles();
-    } else {
-      alert('업로드 실패: ' + r.status);
-    }
+    await directUpload('/api/team-files', file,
+      { fileName: file.name.replace(/\.[^.]+$/, '') },
+      function(pct) { txt.textContent = '업로드 중... ' + pct + '%'; });
+    resetFilePick('file-input', 'file-pick-txt');
+    await loadFiles();
+    toast('파일 업로드 완료 ✓');
   } catch(e) {
-    alert('오류: ' + e.message);
+    txt.textContent = file.name;
+    alert('업로드 실패: ' + e.message);
+  } finally {
+    btn.disabled = false;
   }
 }
 
@@ -3267,28 +3317,23 @@ async function uploadManual() {
     return;
   }
 
-  var token = localStorage.getItem('ws_token') || '';
-  var formData = new FormData();
-  formData.append('file', file);
-  formData.append('title', file.name.replace(/\.[^.]+$/, ''));
-  formData.append('category', document.getElementById('manual-cat').value);
-  formData.append('subcategory', document.getElementById('manual-subcat').value);
-
+  var btn = document.getElementById('manual-upload-btn');
+  var txt = document.getElementById('manual-pick-txt');
+  btn.disabled = true;
   try {
-    var r = await fetch('/api/manuals/upload', {
-      method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + token },
-      body: formData
-    });
-
-    if (r.ok) {
-      resetFilePick('manual-input', 'manual-pick-txt');
-      await loadManuals();
-    } else {
-      alert('업로드 실패: ' + r.status);
-    }
+    await directUpload('/api/manuals', file, {
+      title: file.name.replace(/\.[^.]+$/, ''),
+      category: document.getElementById('manual-cat').value,
+      subcategory: document.getElementById('manual-subcat').value
+    }, function(pct) { txt.textContent = '업로드 중... ' + pct + '%'; });
+    resetFilePick('manual-input', 'manual-pick-txt');
+    await loadManuals();
+    toast('메뉴얼 업로드 완료 ✓');
   } catch(e) {
-    alert('오류: ' + e.message);
+    txt.textContent = file.name;
+    alert('업로드 실패: ' + e.message);
+  } finally {
+    btn.disabled = false;
   }
 }
 

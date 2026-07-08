@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Depends, UploadFile, File, Form
+from fastapi import FastAPI, HTTPException, Depends, UploadFile, File, Form, Body
 from fastapi.responses import JSONResponse, FileResponse, Response
 from urllib.parse import quote
 from fastapi.middleware.cors import CORSMiddleware
@@ -644,6 +644,69 @@ async def upload_team_file(
     except Exception as ex:
         raise HTTPException(500, f"Upload failed: {str(ex)}")
 
+# ── 대용량 파일 직접 업로드 ─────────────────────────────────────────────
+# Vercel 서버리스 함수는 요청 본문이 4.5MB로 제한되어 그 이상은 413이 난다.
+# 브라우저가 서명 URL로 Firebase Storage에 직접 올린 뒤 메타데이터만 등록한다.
+
+def _make_upload_url(prefix: str, file_name: str, content_type: str):
+    blob_path = f"{prefix}/{datetime.now().isoformat()}_{file_name}"
+    blob = bucket.blob(blob_path)
+    url = blob.generate_signed_url(
+        version="v4",
+        expiration=timedelta(minutes=30),
+        method="PUT",
+        content_type=content_type or "application/octet-stream",
+    )
+    return url, blob_path
+
+def _uploaded_blob(prefix: str, blob_path: str):
+    """직접 업로드된 blob을 검증하고 메타데이터가 채워진 상태로 반환."""
+    if not blob_path.startswith(prefix + "/") or ".." in blob_path:
+        raise HTTPException(400, "Invalid blobPath")
+    blob = bucket.get_blob(blob_path)
+    if blob is None:
+        raise HTTPException(400, "File not found in storage. Upload it first.")
+    return blob
+
+def _blob_original_name(blob) -> str:
+    """'prefix/타임스탬프_원본명' 경로에서 원본 파일명 추출 (폴백용)."""
+    return blob.name.split("/", 1)[-1].split("_", 1)[-1]
+
+@app.post("/api/team-files/upload-url")
+async def team_file_upload_url(payload: dict = Body(...), u: str = Depends(current_user)):
+    """팀 파일 직접 업로드용 서명 URL 발급."""
+    require(u, "upload_teamfiles")
+    ensure_db()
+    file_name = str(payload.get("fileName") or "").strip()
+    if not file_name:
+        raise HTTPException(400, "fileName is required")
+    try:
+        url, blob_path = _make_upload_url("team_files", file_name, str(payload.get("contentType") or ""))
+        return JSONResponse({"uploadUrl": url, "blobPath": blob_path})
+    except Exception as ex:
+        raise HTTPException(500, f"Signed URL failed: {ex}")
+
+@app.post("/api/team-files/register")
+async def register_team_file(payload: dict = Body(...), u: str = Depends(current_user)):
+    """직접 업로드 완료 후 팀 파일 메타데이터 등록."""
+    require(u, "upload_teamfiles")
+    ensure_db()
+    blob = _uploaded_blob("team_files", str(payload.get("blobPath") or ""))
+    original = str(payload.get("originalFileName") or "").strip() or _blob_original_name(blob)
+    team_file = {
+        "fileName": str(payload.get("fileName") or "").strip() or original,
+        "originalFileName": original,
+        "description": str(payload.get("description") or ""),
+        "filePath": blob.name,
+        "fileSize": blob.size,
+        "uploadedBy": u,
+        "createdAt": firestore.SERVER_TIMESTAMP,
+    }
+    ref = db.collection("team_files").document()
+    ref.set(team_file)
+    audit_log(u, "teamfile_upload", ref.id, original)
+    return JSONResponse({"id": ref.id, "success": True, "fileName": original, "filePath": blob.name})
+
 @app.get("/api/team-files/{file_id}/download")
 async def download_team_file(file_id: str, u: str = Depends(current_user)):
     """Download a team file (all can download)."""
@@ -782,6 +845,42 @@ async def upload_manual(
         })
     except Exception as ex:
         raise HTTPException(500, f"Upload failed: {str(ex)}")
+
+@app.post("/api/manuals/upload-url")
+async def manual_upload_url(payload: dict = Body(...), u: str = Depends(current_user)):
+    """메뉴얼 직접 업로드용 서명 URL 발급 (모든 로그인 계정 가능)."""
+    ensure_db()
+    file_name = str(payload.get("fileName") or "").strip()
+    if not file_name:
+        raise HTTPException(400, "fileName is required")
+    try:
+        url, blob_path = _make_upload_url("manuals", file_name, str(payload.get("contentType") or ""))
+        return JSONResponse({"uploadUrl": url, "blobPath": blob_path})
+    except Exception as ex:
+        raise HTTPException(500, f"Signed URL failed: {ex}")
+
+@app.post("/api/manuals/register")
+async def register_manual(payload: dict = Body(...), u: str = Depends(current_user)):
+    """직접 업로드 완료 후 메뉴얼 메타데이터 등록."""
+    ensure_db()
+    blob = _uploaded_blob("manuals", str(payload.get("blobPath") or ""))
+    file_name = str(payload.get("originalFileName") or "").strip() or _blob_original_name(blob)
+    category = str(payload.get("category") or "기타")
+    subcategory = str(payload.get("subcategory") or "")
+    manual = {
+        "title": str(payload.get("title") or "").strip() or file_name,
+        "category": category,
+        "subcategory": subcategory,
+        "fileName": file_name,
+        "filePath": blob.name,
+        "fileSize": blob.size,
+        "uploadedBy": u,
+        "createdAt": firestore.SERVER_TIMESTAMP,
+    }
+    ref = db.collection("manuals").document()
+    ref.set(manual)
+    audit_log(u, "manual_upload", ref.id, f"{category}/{subcategory} · {file_name}")
+    return JSONResponse({"id": ref.id, "success": True, "fileName": file_name, "filePath": blob.name})
 
 @app.get("/api/manuals/{manual_id}/download")
 async def download_manual(manual_id: str, u: str = Depends(current_user)):
