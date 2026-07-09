@@ -3834,8 +3834,7 @@ async function loadPending() {
   }
 }
 
-// Vision 필터: 공정 × A/C 필터 선택에 따라 표준 검사기 목록을 보여주고,
-// 표준 목록에 없는 기존 데이터 값들은 '기존 값' 그룹으로 분리해 유지한다
+// Vision 필터: 공정 × A/C 필터 선택 조합의 표준 검사기 목록만 표시 (엄격)
 function buildPendingVisionFilter() {
   var sel = document.getElementById('pf-vis');
   if (!sel) return;
@@ -3843,17 +3842,9 @@ function buildPendingVisionFilter() {
   var proc = document.getElementById('pf-proc').value || '공통';  // 전체 → 합집합
   var pol = document.getElementById('pf-pol').value || '공통';
   var std = pendingVisionOptions(proc, pol);
-  var seen = {};
-  std.forEach(function(v) { seen[v] = 1; });
-  var legacy = [];
-  pendingIssues.forEach(function(p) {
-    if (p.vision && !seen[p.vision]) { seen[p.vision] = 1; legacy.push(p.vision); }
-  });
-  legacy.sort();
-  function opt(v) { return '<option value="' + escAttr(v) + '">' + esc(v) + '</option>'; }
-  var html = '<option value="">Vision 전체</option>' + std.map(opt).join('');
-  if (legacy.length) html += '<optgroup label="기존 값">' + legacy.map(opt).join('') + '</optgroup>';
-  sel.innerHTML = html;
+  sel.innerHTML = '<option value="">Vision 전체</option>' + std.map(function(v) {
+    return '<option value="' + escAttr(v) + '">' + esc(v) + '</option>';
+  }).join('');
   sel.value = cur;
   if (sel.value !== cur) sel.value = '';
 }
@@ -4086,12 +4077,12 @@ async function openPendingFile(issueId, attIndex) {
 // ── Vision 선택지: 공정 × A/C 종속 목록 ──
 var PENDING_VMAP = {
   COT: {
-    A: ['Top Header', 'Top Surface', 'Back Header', 'Top Mismatch', 'Back Mismatch', 'Half Slitter', 'Thickness', 'Sliding'],
-    C: ['Top Header', 'Top Surface', 'Back Header', 'Top Mismatch', 'Back Mismatch', 'Top Overlay', 'Back Overlay', 'Half Slitter', 'Thickness', 'Top Insulation Thickness', 'Back Insulation Thickness']
+    A: ['Master', 'Top Header', 'Top Surface', 'Back Header', 'Top Mismatch', 'Back Mismatch', 'Half Slitter', 'Thickness', 'Sliding'],
+    C: ['Master', 'Top Header', 'Top Surface', 'Back Header', 'Top Mismatch', 'Back Mismatch', 'Top Overlay', 'Back Overlay', 'Half Slitter', 'Thickness', 'Top Insulation Thickness', 'Back Insulation Thickness']
   },
   RP: {
-    A: ['Top Surface', 'Back Surface', '1st Thickness', '2nd Thickness', 'Align Vision'],
-    C: ['Top Surface', 'Back Surface', 'Top Overlay', 'Back Overlay', 'Foil Pinhole', '1st Thickness', '2nd Thickness', 'Align Vision']
+    A: ['Master', 'Top Surface', 'Back Surface', '1st Thickness', '2nd Thickness', 'Align Vision'],
+    C: ['Master', 'Top Surface', 'Back Surface', 'Top Overlay', 'Back Overlay', 'Foil Pinhole', '1st Thickness', '2nd Thickness', 'Align Vision']
   }
 };
 
@@ -4316,7 +4307,7 @@ var UI_DICT = {
   '완료된 이슈가 없습니다': 'No completed issues',
   '필터에 맞는 이슈가 없습니다': 'No issues match the filters',
   '공정 전체': 'All Processes', 'A/C 전체': 'All A/C', 'Vision 전체': 'All Visions',
-  '상태 전체': 'All Status', '공통': 'Common', '기존 값': 'Legacy values',
+  '상태 전체': 'All Status', '공통': 'Common',
   '검색 (내용·담당자·No...)': 'Search (content · PIC · No...)',
   '발행 후 경과일': 'Days since issued', '기한 초과': 'Overdue',
   '조치 / 진행사항': 'Action / Progress', '첨부파일': 'Attachments', '첨부 없음': 'No attachments',
