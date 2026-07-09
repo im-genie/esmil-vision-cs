@@ -1053,16 +1053,11 @@ function showPage(name,btn){
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
         <div><label class="fl">공정</label>
-          <select id="pi-proc" style="width:100%"><option>COT</option><option>RP</option><option value="공통">공통</option></select></div>
+          <select id="pi-proc" style="width:100%" onchange="buildPendingVisionSelect()"><option>COT</option><option>RP</option><option value="공통">공통</option></select></div>
         <div><label class="fl">A/C</label>
-          <select id="pi-pol" style="width:100%"><option value="C">Cathode</option><option value="A">Anode</option><option value="공통">공통</option></select></div>
+          <select id="pi-pol" style="width:100%" onchange="buildPendingVisionSelect()"><option value="C">Cathode</option><option value="A">Anode</option><option value="공통">공통</option></select></div>
         <div><label class="fl">Vision (검사기)</label>
-          <input id="pi-vision" type="text" style="width:100%" list="vision-presets" placeholder="선택 또는 입력">
-          <datalist id="vision-presets">
-            <option>BAR TYPE</option><option>Master</option><option>Pinhole</option><option>Foil Pinhole</option>
-            <option>Rollmap</option><option>Auto Align</option><option>Overlay</option><option>Wet Align Overlay</option>
-            <option>Dry Overlay</option><option>Top Overlay</option><option>Half Cut</option><option>공통</option>
-          </datalist>
+          <select id="pi-vision" style="width:100%"></select>
         </div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
@@ -2431,35 +2426,69 @@ function eCard(e) {
     + '</div>';
 }
 
+// ── 키워드 전체 검색: 날짜 범위와 무관하게 서버에서 전 기간 검색 ──
+var logSearchCache = {};   // kw → entries
+var logSearchTimer = null;
+
+async function fetchLogSearch(kw) {
+  var res = await apiGet('/api/entries/search?q=' + encodeURIComponent(kw));
+  if (res && res.entries) {
+    logSearchCache[kw] = { entries: res.entries, capped: !!res.capped };
+    // 입력값이 그대로면 다시 렌더
+    var cur = document.getElementById('lf-kw').value.toLowerCase().trim();
+    if (cur === kw) renderLog();
+  }
+}
+
 function renderLog() {
-  // If lf-from is outside current data range, fetch that range first
+  var kw=document.getElementById('lf-kw').value.toLowerCase().trim();
   var lf=document.getElementById('lf-from');
   var lt=document.getElementById('lf-to');
   var fr=lf?lf.value:'', to=lt?lt.value:'';
-  // Check if requested range is outside what we've ALREADY fetched (not data's actual dates).
-  // Comparing against data's min/max caused an infinite loop when no records existed up to "to".
-  var needFetch = (fr && (!loadedFrom || fr < loadedFrom)) || (to && (!loadedTo || to > loadedTo));
+  // 키워드가 없을 때만 날짜 범위 기준으로 부족한 데이터를 추가 로드
+  var needFetch = !kw && ((fr && (!loadedFrom || fr < loadedFrom)) || (to && (!loadedTo || to > loadedTo)));
   if(needFetch && session.token){
     fetchRange(fr||loadedFrom||daysAgo(30), to||loadedTo||today());
     return; // fetchRange will call renderLog again
   }
   var pf=document.getElementById('lf-proc').value,cf=document.getElementById('lf-ca').value;
   var af=document.getElementById('lf-act').value;
-  var lfFrom=document.getElementById('lf-from');
-  var lfTo=document.getElementById('lf-to');
-  var fr=lfFrom.value, to=lfTo.value;
-  var kw=document.getElementById('lf-kw').value.toLowerCase().trim();
-  var rows=data.slice().reverse();
+  var tbody=document.getElementById('log-body');
+  var searchMode = !!kw;
+  var searchInfo = '';
+  var rows;
+
+  // 날짜 입력은 키워드 검색 중엔 무시됨을 시각적으로 표시
+  lf.style.opacity = searchMode ? '.4' : '';
+  lt.style.opacity = searchMode ? '.4' : '';
+
+  if (searchMode) {
+    var hit = logSearchCache[kw];
+    if (!hit) {
+      clearTimeout(logSearchTimer);
+      logSearchTimer = setTimeout(function() { fetchLogSearch(kw); }, 350);
+      tbody.innerHTML = '<tr><td colspan="16"><div class="empty"><div class="ei">&#128269;</div><div class="et">'
+        + (transLang === 'en' ? 'Searching all records...' : '전체 기간에서 검색 중...') + '</div></div></td></tr>';
+      return;
+    }
+    rows = hit.entries.slice();  // 서버에서 날짜 내림차순, 전 기간
+    searchInfo = transLang === 'en'
+      ? 'Searched all records regardless of date range: ' + rows.length + (hit.capped ? '+ (showing first 300)' : '') + ' matches'
+      : '날짜 범위와 무관하게 전체 기간 검색: ' + rows.length + '건' + (hit.capped ? ' (최대 300건 표시)' : '');
+  } else {
+    rows = data.slice().reverse();
+    if(fr)rows=rows.filter(function(e){return e.date>=fr;});
+    if(to)rows=rows.filter(function(e){return e.date<=to;});
+  }
   if(pf)rows=rows.filter(function(e){return e.proc===pf;});
   if(cf)rows=rows.filter(function(e){return e.ca===cf;});
   if(af)rows=rows.filter(function(e){return e.action===af;});
-  if(fr)rows=rows.filter(function(e){return e.date>=fr;});
-  if(to)rows=rows.filter(function(e){return e.date<=to;});
-  if(kw)rows=rows.filter(function(e){return [e.reviewer,e.vision,e.action,e.status,e.act,e.lot].join(' ').toLowerCase().includes(kw);});
-  var tbody=document.getElementById('log-body');
   if(!rows.length){tbody.innerHTML='<tr><td colspan="16"><div class="empty"><div class="ei">&#128269;</div><div class="et">No matching entries</div></div></td></tr>';return;}
-  tbody.innerHTML=rows.map(function(e){
-    var n=data.length-data.findIndex(function(x){return x.id===e.id;});
+  var infoRow = searchInfo
+    ? '<tr><td colspan="16" style="background:var(--bld);color:var(--bl);font-size:11.5px;font-weight:600;padding:7px 12px">&#128269; ' + searchInfo + '</td></tr>'
+    : '';
+  tbody.innerHTML=infoRow+rows.map(function(e, ri){
+    var n=searchMode ? rows.length-ri : data.length-data.findIndex(function(x){return x.id===e.id;});
     var isRP=e.proc==='RollPress';
     var isLot=kw&&e.lot&&e.lot.toLowerCase().includes(kw)&&kw.length>=3;
     var photos=e.photos||[];
@@ -2753,10 +2782,22 @@ function fmtText(s) {
 // ── Translation cache & MyMemory API ──────────────────────────
 var _tCache = {};  // cache: text → translated text
 
+// 번역 결과를 localStorage에도 저장 (무료 API 호출량 절약, 재방문 시 즉시 적용)
+var _tStore = {};
+try { _tStore = JSON.parse(localStorage.getItem('ws_tr_cache') || '{}'); } catch(e) { _tStore = {}; }
+function _tStoreSave() {
+  try {
+    var ks = Object.keys(_tStore);
+    if (ks.length > 800) ks.slice(0, ks.length - 800).forEach(function(k) { delete _tStore[k]; });
+    localStorage.setItem('ws_tr_cache', JSON.stringify(_tStore));
+  } catch(e) {}
+}
+
 async function translateText(text, from, to) {
   if (!text || text === '—') return text;
   var key = from+'|'+to+'|'+text;
   if (_tCache[key]) return _tCache[key];
+  if (_tStore[key]) { _tCache[key] = _tStore[key]; return _tStore[key]; }
   try {
     var url = 'https://api.mymemory.translated.net/get?q='
       + encodeURIComponent(text.slice(0, 500))
@@ -2767,6 +2808,7 @@ async function translateText(text, from, to) {
       ? d.responseData.translatedText
       : text;
     _tCache[key] = result;
+    if (result !== text) { _tStore[key] = result; _tStoreSave(); }
     return result;
   } catch(e) {
     return text;
@@ -2954,7 +2996,7 @@ function taskRow(t) {
     ? '<span class="task-meta">&#10003; ' + esc(t.completedBy) + (t.completedAt ? ' · ' + fmtWhen(t.completedAt) : '') + '</span>'
     : '';
   return '<div class="task-row">' + chk
-    + '<span class="task-txt' + (t.completed ? ' done' : '') + '" onclick="toggleTask(\'' + t.id + '\')">' + esc(t.title) + meta + '</span>'
+    + '<span class="task-txt' + (t.completed ? ' done' : '') + '" data-tr onclick="toggleTask(\'' + t.id + '\')">' + esc(t.title) + meta + '</span>'
     + btns + '</div>';
 }
 
@@ -3232,7 +3274,7 @@ function renderFiles() {
         : '';
       html += '<div class="file-row">';
       html += '<div class="file-ic">' + fileIcon(realName) + '</div>';
-      html += '<div class="file-nm"><b>' + esc(f.fileName) + '</b><div class="file-meta">' + fmtSize(f.fileSize) + '</div></div>';
+      html += '<div class="file-nm"><b data-tr>' + esc(f.fileName) + '</b><div class="file-meta">' + fmtSize(f.fileSize) + '</div></div>';
       html += '<div class="file-acts">';
       html += '<button class="btn btn-xs btn-g" onclick="previewFile(\'' + f.id + '\', \'' + escAttr(realName) + '\')">보기</button>';
       html += '<button class="btn btn-xs btn-p" onclick="downloadFile(\'' + f.id + '\')">다운</button>';
@@ -3411,7 +3453,7 @@ function manualRow(m) {
     : '';
   return '<div class="file-row">'
     + '<div class="file-ic">' + fileIcon(m.fileName || m.title) + '</div>'
-    + '<div class="file-nm"><b>' + esc(m.title) + '</b>'
+    + '<div class="file-nm"><b data-tr>' + esc(m.title) + '</b>'
     + '<div class="file-meta">' + sub + '<span>' + esc(m.fileName || '') + '</span><span>·</span><span>' + fmtSize(m.fileSize) + '</span></div></div>'
     + '<div class="file-acts">'
     + '<button class="btn btn-xs btn-g" onclick="previewManual(\'' + m.id + '\')">보기</button>'
@@ -3624,6 +3666,9 @@ var AUDIT_LABELS = {
   account_create:    ['계정 생성', 't-pu'],
   account_update:    ['계정 변경', 't-pu'],
   account_delete:    ['계정 삭제', 't-rd'],
+  pending_create:    ['이슈 등록', 't-gn'],
+  pending_update:    ['이슈 수정', 't-bl'],
+  pending_delete:    ['이슈 삭제', 't-rd'],
   login_fail:        ['로그인 실패', 't-rd']
 };
 
@@ -3781,7 +3826,7 @@ function pendingRow(p, isHist) {
   h += '</div></div>';
 
   // ── 내용 ──
-  h += '<div class="prow-desc" onclick="togglePendingRow(\'' + p.id + '\')">' + esc(p.description) + '</div>';
+  h += '<div class="prow-desc" data-tr onclick="togglePendingRow(\'' + p.id + '\')">' + esc(p.description) + '</div>';
 
   // ── 메타 ──
   var due = p.dueDate
@@ -3798,7 +3843,7 @@ function pendingRow(p, isHist) {
 
   // ── 펼침: 조치/진행사항 + 첨부 ──
   if (open) {
-    if (p.details) h += '<div class="prow-detail"><b>조치 / 진행사항</b>\n' + esc(p.details) + '</div>';
+    if (p.details) h += '<div class="prow-detail" data-tr><b>조치 / 진행사항</b>\n' + esc(p.details) + '</div>';
     if ((p.attachments || []).length) {
       h += '<div class="prow-atts">' + p.attachments.map(function(a, i) {
         return '<span class="patt" onclick="event.stopPropagation();openPendingFile(\'' + p.id + '\',' + i + ')" title="' + escAttr(a.name) + '">'
@@ -3915,6 +3960,46 @@ async function openPendingFile(issueId, attIndex) {
   }
 }
 
+// ── Vision 선택지: 공정 × A/C 종속 목록 ──
+var PENDING_VMAP = {
+  COT: {
+    A: ['Top Header', 'Top Surface', 'Back Header', 'Top Mismatch', 'Back Mismatch', 'Half Slitter', 'Thickness', 'Sliding'],
+    C: ['Top Header', 'Top Surface', 'Back Header', 'Top Mismatch', 'Back Mismatch', 'Top Overlay', 'Back Overlay', 'Half Slitter', 'Thickness', 'Top Insulation Thickness', 'Back Insulation Thickness']
+  },
+  RP: {
+    A: ['Top Surface', 'Back Surface', '1st Thickness', '2nd Thickness', 'Align Vision'],
+    C: ['Top Surface', 'Back Surface', 'Top Overlay', 'Back Overlay', 'Foil Pinhole', '1st Thickness', '2nd Thickness', 'Align Vision']
+  }
+};
+
+function pendingVisionOptions(proc, pol) {
+  var procs = proc === '공통' ? ['COT', 'RP'] : [proc];
+  var pols = pol === '공통' ? ['A', 'C'] : [pol];
+  var seen = {}, out = [];
+  procs.forEach(function(pr) {
+    pols.forEach(function(po) {
+      ((PENDING_VMAP[pr] || {})[po] || []).forEach(function(v) {
+        if (!seen[v]) { seen[v] = 1; out.push(v); }
+      });
+    });
+  });
+  out.push('공통');
+  return out;
+}
+
+// keep: 유지할 현재 값 (기존 이슈의 목록 외 값도 옵션으로 임시 추가)
+function buildPendingVisionSelect(keep) {
+  var sel = document.getElementById('pi-vision');
+  var cur = (keep !== undefined) ? keep : sel.value;
+  var opts = pendingVisionOptions(document.getElementById('pi-proc').value,
+                                  document.getElementById('pi-pol').value);
+  if (cur && opts.indexOf(cur) === -1) opts.unshift(cur);
+  sel.innerHTML = opts.map(function(v) {
+    return '<option value="' + escAttr(v) + '">' + esc(v) + '</option>';
+  }).join('');
+  sel.value = (cur && opts.indexOf(cur) !== -1) ? cur : opts[0];
+}
+
 // ── 등록/수정 모달 ──
 function openPendingModal(id) {
   pendingEditId = id;
@@ -3929,7 +4014,7 @@ function openPendingModal(id) {
   document.getElementById('pi-assignee').value = p ? (p.assignee || '') : '';
   document.getElementById('pi-proc').value = p ? (p.process || 'COT') : 'COT';
   document.getElementById('pi-pol').value = p ? (p.polarity || 'C') : 'C';
-  document.getElementById('pi-vision').value = p ? (p.vision || '') : '';
+  buildPendingVisionSelect(p ? (p.vision || '') : '');
   document.getElementById('pi-due').value = p ? (p.dueDate || '') : '';
   document.getElementById('pi-status').value = p ? (p.status || 'ongoing') : 'ongoing';
   document.getElementById('pi-desc').value = p ? (p.description || '') : '';
@@ -4051,7 +4136,10 @@ async function exportPendingExcel() {
   try {
     await loadSheetJS();
     var stTxt = { ongoing: 'ongoing', monitoring: 'monitoring', completed: 'completed' };
-    var rows = pendingIssues.slice().sort(function(a, b) { return (a.issueNo || 0) - (b.issueNo || 0); })
+    // 완료·진행중 구분 없이 발행일 시간순(오래된 순)으로 정렬
+    var rows = pendingIssues.slice().sort(function(a, b) {
+      return String(a.issueDate || '').localeCompare(String(b.issueDate || '')) || (a.issueNo || 0) - (b.issueNo || 0);
+    })
       .map(function(p) {
         return {
           'No': p.issueNo, 'Issued Date': p.issueDate, 'Category': p.category,
@@ -4075,6 +4163,215 @@ async function exportPendingExcel() {
   } catch(e) {
     alert('내보내기 실패: ' + e.message);
   }
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// 전체 UI 영어 전환 (EN 버튼)
+//  - UI 라벨: 사전(UI_DICT) + 패턴(UI_RULES) 기반 텍스트 노드 치환, KO 복원 가능
+//  - 사용자 데이터: [data-tr] 요소를 MyMemory 무료 번역 API로 자동 번역
+//  - MutationObserver로 동적으로 렌더되는 내용도 자동 처리
+// ════════════════════════════════════════════════════════════════════════
+
+var UI_DICT = {
+  // 공통 버튼/라벨
+  '수정': 'Edit', '삭제': 'Delete', '취소': 'Cancel', '저장': 'Save', '보기': 'View',
+  '다운': 'DL', '등록': 'Add', '추가': 'Add', '완료': 'Completed', '재오픈': 'Reopen',
+  '업로드': 'Upload', '다운로드': 'Download', '알림': 'Alerts', '켜짐': 'On',
+  '✓ 저장': '✓ Save', '✕ 취소': '✕ Cancel', '✓ 완료': '✓ Complete', '↺ 재오픈': '↺ Reopen',
+  '＋ 등록': '＋ Add', '＋ 이슈 등록': '＋ New Issue', '⬆ 업로드': '⬆ Upload',
+  // Tasks
+  '오늘의 할일': "Today's To-Do", '진행도': 'Progress', '할 일 입력...': 'Add a task...',
+  '오늘의 할일이 없습니다': 'No to-dos for today',
+  '과거 할일': 'Past To-Do', '과거 할일이 없습니다': 'No past to-dos',
+  // Pending List
+  '이슈 등록': 'New Issue', '이슈 수정': 'Edit Issue', '이슈 삭제': 'Issue Deleted',
+  '진행중': 'On-Going', '모니터링': 'Monitoring', '완료된 이슈': 'Completed issues',
+  '진행중인 이슈가 없습니다': 'No on-going issues',
+  '완료된 이슈가 없습니다': 'No completed issues',
+  '필터에 맞는 이슈가 없습니다': 'No issues match the filters',
+  '공정 전체': 'All Processes', 'A/C 전체': 'All A/C', 'Vision 전체': 'All Visions',
+  '상태 전체': 'All Status', '공통': 'Common',
+  '검색 (내용·담당자·No...)': 'Search (content · PIC · No...)',
+  '발행 후 경과일': 'Days since issued', '기한 초과': 'Overdue',
+  '조치 / 진행사항': 'Action / Progress', '첨부파일': 'Attachments', '첨부 없음': 'No attachments',
+  '첨부 제거': 'Remove attachment', '선택 취소': 'Clear selection',
+  '진행중으로 되돌리기': 'Move back to on-going',
+  '이슈 내용 (현상)': 'Issue Description',
+  '조치 / 진행사항 (NSYS 답변)': 'Action / Progress (NSYS Reply)',
+  '담당자': 'Person in Charge', '공정': 'Process', '분류': 'Category', '파일': 'File',
+  'Vision (검사기)': 'Vision (Machine)',
+  '진행중 (On-Going)': 'On-Going', '모니터링 (Monitoring)': 'Monitoring', '완료 (Completed)': 'Completed',
+  '- 현상 : ...': '- Symptom: ...',
+  '조치 내용, 진행 상황, OEM 답변...': 'Actions taken, progress, OEM reply...',
+  '이름': 'Name', 'Excel 다운로드': 'Download as Excel',
+  '파일 선택': 'Choose file', '또는 드래그': 'or drag & drop',
+  '또는 드래그 (여러 개 가능)': 'or drag & drop (multiple)',
+  '파일이 없습니다': 'No files',
+  // Manual
+  '메뉴얼 업로드': 'Manual Upload', '메뉴얼 목록': 'Manual List',
+  '메뉴얼 검색...': 'Search manuals...', '메뉴얼이 없습니다': 'No manuals',
+  '메뉴얼 삭제': 'Manual Deleted', '기타': 'Others',
+  // Admin
+  '계정 관리': 'Account Management', '새 계정 추가': 'Add New Account',
+  '아이디 (영문/숫자)': 'Username (letters/numbers)', '비밀번호': 'Password',
+  '표시 이름': 'Display Name', '역할': 'Role', '감사 로그': 'Audit Log',
+  '7일 보관': 'kept 7 days', '계정/동작 검색...': 'Search account/action...',
+  '검색 결과가 없습니다': 'No results', '계정이 없습니다': 'No accounts',
+  '기록된 로그가 없습니다': 'No log entries',
+  '기록 등록': 'Entry Created', '기록 수정': 'Entry Updated', '기록 삭제': 'Entry Deleted',
+  '기록 일괄등록': 'Bulk Import', '할일 등록': 'Task Created', '할일 수정': 'Task Updated',
+  '할일 삭제': 'Task Deleted', '할일 체크': 'Task Checked', '체크 해제': 'Task Unchecked',
+  '파일 업로드': 'File Uploaded', '파일 삭제': 'File Deleted',
+  '계정 생성': 'Account Created', '계정 변경': 'Account Updated', '계정 삭제': 'Account Deleted',
+  '로그인 실패': 'Login Failed',
+  // Entry/Stats/기타
+  '지난 근무일(08:00~08:00) 항목 보기': 'View previous work day (08:00–08:00)',
+  '지난 근무일': 'Previous work day', '현재 근무일': 'Current work day', '이전 근무일': 'Previous work day',
+  '데이터 로딩 중...': 'Loading...', '불러오는 중...': 'Loading...',
+  '알림 켜기': 'Enable Alerts', '알림 켜짐 — 탭하면 이 기기 재등록': 'Alerts on — tap to re-register',
+  // 토스트
+  '파일 업로드 완료 ✓': 'File uploaded ✓', '메뉴얼 업로드 완료 ✓': 'Manual uploaded ✓',
+  '이슈 등록 완료 ✓': 'Issue created ✓', '이슈 수정 완료 ✓': 'Issue updated ✓',
+  '이슈 삭제됨': 'Issue deleted', '재오픈 ✓': 'Reopened ✓',
+  '완료 처리 → Pending History로 이동 ✓': 'Completed → moved to Pending History ✓'
+};
+
+var UI_RULES = [
+  { re: /^(\d+)\/(\d+) 완료$/, en: '$1/$2 done' },
+  { re: /^✓ 완료 (.+)$/, en: '✓ Done $1' },
+  { re: /^발행 (.+)$/, en: 'Issued $1' },
+  { re: /^기한 (.+)$/, en: 'Due $1' },
+  { re: /^담당 (.+)$/, en: 'PIC $1' },
+  { re: /^업데이트 (.+)$/, en: 'Updated $1' },
+  { re: /^업로드 중\.\.\.\s*(\d+)%$/, en: 'Uploading... $1%' }
+];
+
+// 사전 조회: 정확 일치 → (아이콘 등) 앞머리 떼고 일치 → 패턴 규칙
+function lookupUi(s) {
+  if (UI_DICT[s]) return UI_DICT[s];
+  var pre = s.match(/^[^가-힣]+/);
+  if (pre && UI_DICT[s.slice(pre[0].length)]) return pre[0] + UI_DICT[s.slice(pre[0].length)];
+  for (var i = 0; i < UI_RULES.length; i++) {
+    if (UI_RULES[i].re.test(s)) return s.replace(UI_RULES[i].re, UI_RULES[i].en);
+  }
+  return null;
+}
+
+var _trNodes = [];   // 치환된 텍스트 노드 원본 (KO 복원용)
+var _trAttrs = [];   // 치환된 속성 원본
+var _trData = [];    // 기계번역된 데이터 노드 원본
+var _TR_SKIP = { SCRIPT: 1, STYLE: 1, TEXTAREA: 1 };
+
+function translateSubtree(root) {
+  if (transLang !== 'en') return;
+  if (root.nodeType === 3) { translateUiTextNode(root); return; }
+  if (root.nodeType !== 1 || _TR_SKIP[root.tagName]) return;
+  var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+    acceptNode: function(n) {
+      return (n.parentElement && _TR_SKIP[n.parentElement.tagName])
+        ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT;
+    }
+  });
+  var t;
+  while ((t = walker.nextNode())) translateUiTextNode(t);
+  // placeholder/title 속성
+  var els = [];
+  if (root.matches && root.matches('[placeholder],[title]')) els.push(root);
+  if (root.querySelectorAll) els = els.concat(Array.prototype.slice.call(root.querySelectorAll('[placeholder],[title]')));
+  els.forEach(function(el) {
+    ['placeholder', 'title'].forEach(function(a) {
+      var v = el.getAttribute(a);
+      if (!v || !/[가-힣]/.test(v)) return;
+      var en = lookupUi(v.trim());
+      if (en) { _trAttrs.push({ el: el, attr: a, ko: v }); el.setAttribute(a, en); }
+    });
+  });
+}
+
+function translateUiTextNode(t) {
+  var raw = t.data;
+  var s = raw.trim();
+  if (!s || !/[가-힣]/.test(s)) return;
+  var en = lookupUi(s);
+  if (en) { _trNodes.push({ node: t, ko: raw }); t.data = raw.replace(s, en); }
+}
+
+function restoreKorean() {
+  _trNodes.forEach(function(r) { if (r.node.isConnected) r.node.data = r.ko; });
+  _trAttrs.forEach(function(r) { if (r.el.isConnected) r.el.setAttribute(r.attr, r.ko); });
+  _trData.forEach(function(r) {
+    if (r.node.isConnected) {
+      r.node.data = r.ko;
+      if (r.node.parentElement) r.node.parentElement.removeAttribute('data-tr-done');
+    }
+  });
+  _trNodes = []; _trAttrs = []; _trData = [];
+}
+
+// ── 사용자 데이터([data-tr]) 자동 번역 ──
+function queueDataTranslate(root) {
+  if (transLang !== 'en' || root.nodeType !== 1) return;
+  var els = [];
+  if (root.hasAttribute && root.hasAttribute('data-tr')) els.push(root);
+  if (root.querySelectorAll) els = els.concat(Array.prototype.slice.call(root.querySelectorAll('[data-tr]')));
+  els.forEach(translateDataEl);
+}
+
+async function translateDataEl(el) {
+  if (el.getAttribute('data-tr-done')) return;
+  el.setAttribute('data-tr-done', '1');
+  var nodes = Array.prototype.filter.call(el.childNodes, function(n) {
+    return n.nodeType === 3 && /[가-힣]/.test(n.data);
+  });
+  for (var i = 0; i < nodes.length; i++) {
+    var ko = nodes[i].data;
+    var en = await translateText(ko.trim(), 'ko', 'en');
+    if (transLang !== 'en') return;  // 번역 중 KO로 전환되면 중단
+    if (en && en !== ko.trim() && nodes[i].isConnected) {
+      _trData.push({ node: nodes[i], ko: ko });
+      nodes[i].data = en;
+    }
+  }
+}
+
+// 동적으로 렌더되는 모든 내용 자동 번역
+new MutationObserver(function(muts) {
+  if (transLang !== 'en') return;
+  muts.forEach(function(m) {
+    for (var i = 0; i < m.addedNodes.length; i++) {
+      var n = m.addedNodes[i];
+      translateSubtree(n);
+      queueDataTranslate(n);
+    }
+  });
+}).observe(document.body, { childList: true, subtree: true });
+
+// setLang 확장: 언어 전환 시 전체 화면 즉시 적용
+var _origSetLang = setLang;
+setLang = function(l) {
+  _origSetLang(l);
+  if (l === 'en') {
+    translateSubtree(document.body);
+    queueDataTranslate(document.body);
+  } else {
+    restoreKorean();
+  }
+};
+
+// 토스트 메시지도 사전 적용
+var _origToast = toast;
+toast = function(msg, isErr) {
+  if (transLang === 'en') {
+    var en = lookupUi(String(msg).trim());
+    if (en) msg = en;
+  }
+  _origToast(msg, isErr);
+};
+
+// 저장된 언어가 EN이면 초기 화면부터 적용
+if (transLang === 'en') {
+  translateSubtree(document.body);
+  queueDataTranslate(document.body);
 }
 
 var _originalShowPage = window.showPage;

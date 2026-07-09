@@ -385,6 +385,29 @@ async def get_entries(
     except Exception as ex:
         raise HTTPException(500, str(ex))
 
+@app.get("/api/entries/search")
+async def search_entries(q: str = "", u: str = Depends(current_user)):
+    """키워드 전체 검색 — 날짜 범위와 무관하게 모든 기록에서 검색.
+    (/api/entries/{entry_id}보다 먼저 등록되어야 'search'가 id로 매칭되지 않는다)"""
+    ensure_db()
+    kw = (q or "").strip().lower()
+    if not kw:
+        return JSONResponse({"entries": [], "capped": False})
+    fields = ("reviewer", "vision", "action", "status", "act", "lot",
+              "status_en", "act_en", "date")
+    matches = []
+    try:
+        for d in db.collection("entries").stream():
+            e = d.to_dict() or {}
+            hay = " ".join(str(e.get(k) or "") for k in fields).lower()
+            if kw in hay:
+                matches.append(serialize({**e, "id": d.id}))
+        matches.sort(key=lambda x: str(x.get("date", "")), reverse=True)
+        capped = len(matches) > 300
+        return JSONResponse({"entries": matches[:300], "capped": capped})
+    except Exception as ex:
+        raise HTTPException(500, str(ex))
+
 @app.get("/api/entries/{entry_id}")
 async def get_entry(entry_id: str, u: str = Depends(current_user)):
     ensure_db()
