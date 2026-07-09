@@ -354,14 +354,25 @@ async def get_audit(limit: int = 300, u: str = Depends(current_user)):
 # ENTRIES
 # ════════════════════════════════════════════════════════════════════════
 
+def _light_entry(e: dict, include_photos: bool) -> dict:
+    """목록 응답용: 사진(base64)은 매우 커서 기본 제외하고 개수만 내려준다.
+    (30일치 응답이 사진 포함 시 ~22MB/19s → 제외 시 수백 KB/1s 미만)"""
+    photos = e.get("photos") or []
+    e["photoCount"] = len(photos)
+    if not include_photos:
+        e.pop("photos", None)
+    return e
+
 @app.get("/api/entries")
 async def get_entries(
     date_from: Optional[str] = None,
     date_to:   Optional[str] = None,
     action_type: Optional[str] = None,
+    include_photos: Optional[str] = None,
     u: str = Depends(current_user)
 ):
     ensure_db()
+    with_photos = str(include_photos or "").lower() in ("1", "true", "yes")
     try:
         q = db.collection("entries")
         if date_from:
@@ -370,7 +381,7 @@ async def get_entries(
         entries = []
         for d in docs:
             try:
-                e = serialize({**d.to_dict(), "id": d.id})
+                e = serialize(_light_entry({**d.to_dict(), "id": d.id}, with_photos))
                 entries.append(e)
             except Exception:
                 continue
@@ -401,7 +412,7 @@ async def search_entries(q: str = "", u: str = Depends(current_user)):
             e = d.to_dict() or {}
             hay = " ".join(str(e.get(k) or "") for k in fields).lower()
             if kw in hay:
-                matches.append(serialize({**e, "id": d.id}))
+                matches.append(serialize(_light_entry({**e, "id": d.id}, False)))
         matches.sort(key=lambda x: str(x.get("date", "")), reverse=True)
         capped = len(matches) > 300
         return JSONResponse({"entries": matches[:300], "capped": capped})
