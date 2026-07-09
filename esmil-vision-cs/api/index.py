@@ -1,12 +1,12 @@
 from fastapi import FastAPI, HTTPException, Depends, UploadFile, File, Form, Body
 from fastapi.responses import JSONResponse, FileResponse, Response
-from urllib.parse import quote
+from urllib.parse import quote, unquote
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import firebase_admin
 from firebase_admin import credentials, firestore, storage as fb_storage
-import os, json, hashlib, hmac
+import os, json, hashlib, hmac, base64, uuid, re
 from datetime import datetime, timedelta, date
 from zoneinfo import ZoneInfo
 from typing import Optional
@@ -354,13 +354,75 @@ async def get_audit(limit: int = 300, u: str = Depends(current_user)):
 # ENTRIES
 # ════════════════════════════════════════════════════════════════════════
 
+# ── Entry 사진: Firestore base64 대신 Firebase Storage에 저장 ─────────
+# 사진 바이트가 Vercel(API 응답)을 거치지 않고 서명 URL로 직접 전송되도록 한다.
+PHOTO_PREFIX = "entry_photos"
+
+def _photo_signed_url(path: str) -> str:
+    """사진 표시용 서명 URL (12시간 — 근무 교대 내내 유효)."""
+    return bucket.blob(path).generate_signed_url(
+        version="v4", expiration=timedelta(hours=12), method="GET")
+
+def _extract_photo_path(s: str):
+    """서명 URL 또는 경로 문자열에서 entry_photos/... 경로를 추출."""
+    s = str(s or "")
+    if s.startswith(PHOTO_PREFIX + "/"):
+        return s.split("?")[0]
+    m = re.search(r"/(" + PHOTO_PREFIX + r"/[^?]+)", s)
+    return unquote(m.group(1)) if m else None
+
+def _process_photos(entry_id: str, photos) -> list:
+    """클라이언트 photos(신규 base64 / 기존 서명 URL 혼합)를 Storage 경로 목록으로 변환."""
+    paths = []
+    for p in (photos or []):
+        s = str(p or "")
+        if s.startswith("data:"):
+            try:
+                header, b64 = s.split(",", 1)
+                ct = header.split(":", 1)[1].split(";")[0] or "image/jpeg"
+                ext = "png" if "png" in ct else "jpg"
+                blob_path = f"{PHOTO_PREFIX}/{entry_id}/{uuid.uuid4().hex}.{ext}"
+                blob = bucket.blob(blob_path)
+                blob.upload_from_string(base64.b64decode(b64), content_type=ct)
+                paths.append(blob_path)
+            except Exception as ex:
+                print(f"[photos] upload failed: {ex}")
+        else:
+            path = _extract_photo_path(s)
+            if path:
+                paths.append(path)
+    return paths
+
+def _photo_urls(e: dict) -> list:
+    """표시용 사진 목록: 신형(photoPaths) → 서명 URL, 구형(base64 photos) → 그대로."""
+    if e.get("photoPaths"):
+        urls = []
+        for p in e["photoPaths"]:
+            try:
+                urls.append(_photo_signed_url(p))
+            except Exception as ex:
+                print(f"[photos] sign failed: {ex}")
+        return urls
+    return e.get("photos") or []
+
+def _delete_entry_photos(e: dict, keep: list = ()):
+    """엔트리의 Storage 사진 삭제 (keep에 있는 경로는 유지)."""
+    for p in (e.get("photoPaths") or []):
+        if p not in keep:
+            try:
+                bucket.blob(p).delete()
+            except Exception as ex:
+                print(f"[photos] delete failed: {ex}")
+
 def _light_entry(e: dict, include_photos: bool) -> dict:
-    """목록 응답용: 사진(base64)은 매우 커서 기본 제외하고 개수만 내려준다.
-    (30일치 응답이 사진 포함 시 ~22MB/19s → 제외 시 수백 KB/1s 미만)"""
-    photos = e.get("photos") or []
-    e["photoCount"] = len(photos)
-    if not include_photos:
+    """목록 응답용: 사진은 기본 제외하고 개수만. include_photos면 서명 URL 목록.
+    (사진 base64 포함 시 30일치 응답이 ~22MB였다 — 절대 base64를 목록에 싣지 말 것)"""
+    e["photoCount"] = len(e.get("photoPaths") or e.get("photos") or [])
+    if include_photos:
+        e["photos"] = _photo_urls(e)
+    else:
         e.pop("photos", None)
+    e.pop("photoPaths", None)
     return e
 
 @app.get("/api/entries")
@@ -425,15 +487,17 @@ async def get_entry(entry_id: str, u: str = Depends(current_user)):
     doc = db.collection("entries").document(entry_id).get()
     if not doc.exists:
         raise HTTPException(404, "Entry not found")
-    return JSONResponse({"entry": serialize({**doc.to_dict(), "id": doc.id})})
+    return JSONResponse({"entry": serialize(_light_entry({**doc.to_dict(), "id": doc.id}, True))})
 
 @app.post("/api/entries")
 async def create_entry(payload: dict, u: str = Depends(current_user)):
     require(u, "write")
     ensure_db()
     entry = {k: v for k, v in payload.items() if k != "id"}
-    entry.update({"createdBy": u, "createdAt": firestore.SERVER_TIMESTAMP})
     ref = db.collection("entries").document()
+    # 사진은 Storage에 저장하고 경로만 문서에 기록 (base64를 Firestore에 넣지 않는다)
+    entry["photoPaths"] = _process_photos(ref.id, entry.pop("photos", None))
+    entry.update({"createdBy": u, "createdAt": firestore.SERVER_TIMESTAMP})
     ref.set(entry)
     
     # Send push notification
@@ -479,6 +543,12 @@ async def update_entry(entry_id: str, payload: dict, u: str = Depends(current_us
         raise HTTPException(403, "You can only edit entries from the current or previous work day (8am-8am)")
     
     data = {k: v for k, v in payload.items() if k != "id"}
+    if "photos" in data:
+        prev = doc.to_dict() or {}
+        new_paths = _process_photos(entry_id, data.pop("photos"))
+        _delete_entry_photos(prev, keep=new_paths)  # 편집에서 제거된 사진은 Storage에서도 삭제
+        data["photoPaths"] = new_paths
+        data["photos"] = firestore.DELETE_FIELD     # 구형 base64 필드 제거
     data.update({"updatedBy": u, "updatedAt": firestore.SERVER_TIMESTAMP})
     db.collection("entries").document(entry_id).update(data)
     audit_log(u, "entry_edit", entry_id, entry_date)
@@ -496,6 +566,7 @@ async def delete_entry(entry_id: str, u: str = Depends(current_user)):
     if "delete" not in ROLE_PERMS.get(role, []):
         if not can_edit_entry(u, e.get("date", "")):
             raise HTTPException(403, "You can only delete entries from the current or previous work day (8am-8am)")
+    _delete_entry_photos(e)
     db.collection("entries").document(entry_id).delete()
     audit_log(u, "entry_delete", entry_id,
               f"{e.get('date','')} {e.get('proc','')} {e.get('vision','')} {e.get('action','')}")
@@ -943,6 +1014,32 @@ def _signed_preview_url(blob) -> str:
     """Microsoft Office 뷰어가 파일을 읽을 수 있도록 15분짜리 서명 URL 발급."""
     return blob.generate_signed_url(version="v4", expiration=timedelta(minutes=15), method="GET")
 
+def _signed_download_url(blob, filename: str) -> str:
+    """브라우저가 Storage에서 직접 내려받는 다운로드용 서명 URL (Vercel 트래픽 우회)."""
+    return blob.generate_signed_url(
+        version="v4", expiration=timedelta(minutes=60), method="GET",
+        response_disposition=f"attachment; filename*=UTF-8''{quote(filename)}")
+
+@app.get("/api/team-files/{file_id}/download-url")
+async def team_file_download_url(file_id: str, u: str = Depends(current_user)):
+    """다운로드용 서명 URL — 파일 바이트가 API를 거치지 않는다."""
+    ensure_db()
+    doc = db.collection("team_files").document(file_id).get()
+    if not doc.exists:
+        raise HTTPException(404, "File not found")
+    tf = doc.to_dict() or {}
+    fp = tf.get("filePath", "")
+    if not fp:
+        raise HTTPException(404, "File not found")
+    blob = bucket.blob(fp)
+    if not blob.exists():
+        raise HTTPException(404, "File not found in storage")
+    fname = tf.get("originalFileName") or tf.get("fileName") or "download"
+    try:
+        return JSONResponse({"url": _signed_download_url(blob, fname)})
+    except Exception as ex:
+        raise HTTPException(500, f"Signed URL failed: {ex}")
+
 @app.get("/api/team-files/{file_id}/preview-url")
 async def team_file_preview_url(file_id: str, u: str = Depends(current_user)):
     """Office 문서 미리보기용 임시 서명 URL (로그인 필요)."""
@@ -1112,6 +1209,26 @@ async def download_manual(manual_id: str, u: str = Depends(current_user)):
         raise
     except Exception as ex:
         raise HTTPException(500, str(ex))
+
+@app.get("/api/manuals/{manual_id}/download-url")
+async def manual_download_url(manual_id: str, u: str = Depends(current_user)):
+    """다운로드용 서명 URL — 파일 바이트가 API를 거치지 않는다."""
+    ensure_db()
+    doc = db.collection("manuals").document(manual_id).get()
+    if not doc.exists:
+        raise HTTPException(404, "Manual not found")
+    m = doc.to_dict() or {}
+    fp = m.get("filePath", "")
+    if not fp:
+        raise HTTPException(404, "File not found")
+    blob = bucket.blob(fp)
+    if not blob.exists():
+        raise HTTPException(404, "File not found in storage")
+    fname = m.get("fileName") or "download"
+    try:
+        return JSONResponse({"url": _signed_download_url(blob, fname)})
+    except Exception as ex:
+        raise HTTPException(500, f"Signed URL failed: {ex}")
 
 @app.get("/api/manuals/{manual_id}/preview-url")
 async def manual_preview_url(manual_id: str, u: str = Depends(current_user)):

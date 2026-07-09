@@ -6,3 +6,6 @@ firebase-credentials.json
 __pycache__/
 *.pyc
 .venv/
+
+# Local data backups (photo migration etc.)
+backups/

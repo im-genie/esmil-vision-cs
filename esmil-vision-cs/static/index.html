@@ -3404,6 +3404,23 @@ async function authDownload(url, fileName) {
   }
 }
 
+// 파일 바이트가 API(Vercel)를 거치지 않도록 서명 URL로 Storage에서 직접 다운로드.
+// 실패하면 기존 API 중계 방식으로 폴백.
+async function signedDownload(downloadUrl, fileName) {
+  var token = localStorage.getItem('ws_token') || '';
+  try {
+    var r = await fetch(downloadUrl.replace(/\/download$/, '/download-url'),
+                        { headers: { 'Authorization': 'Bearer ' + token } });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    var u = (await r.json()).url;
+    var a = document.createElement('a');
+    a.href = u;
+    document.body.appendChild(a); a.click(); a.remove();
+  } catch(e) {
+    authDownload(downloadUrl, fileName);
+  }
+}
+
 // Office 문서는 Microsoft 공식 뷰어로 표시 (백엔드가 발급한 15분짜리 서명 URL 사용)
 var OFFICE_EXTS = ['xlsx', 'xls', 'docx', 'doc', 'pptx', 'ppt'];
 
@@ -3421,13 +3438,14 @@ async function previewBlob(url, fileName, downloadFn) {
   document.getElementById('file-preview-modal').style.display = 'block';
   box.innerHTML = '<div style="padding:30px;color:var(--mu)">불러오는 중...</div>';
   try {
+    // 이미지/PDF/텍스트도 서명 URL로 Storage에서 직접 받아 API(Vercel) 트래픽을 우회한다
     if (['jpg','jpeg','png','gif','webp','bmp'].indexOf(ext) !== -1) {
-      var blob = await fetchAuthBlob(url);
-      box.innerHTML = '<img src="' + URL.createObjectURL(blob) + '" style="max-width:100%;max-height:80vh">';
+      var signed = await fetchPreviewUrl(url);
+      box.innerHTML = '<img src="' + escAttr(signed) + '" style="max-width:100%;max-height:80vh">';
 
     } else if (ext === 'pdf') {
-      var blob = await fetchAuthBlob(url);
-      box.innerHTML = '<iframe src="' + URL.createObjectURL(blob) + '" style="width:100%;height:80vh;border:none"></iframe>';
+      var signed = await fetchPreviewUrl(url);
+      box.innerHTML = '<iframe src="' + escAttr(signed) + '" style="width:100%;height:80vh;border:none"></iframe>';
 
     } else if (OFFICE_EXTS.indexOf(ext) !== -1) {
       var signed = await fetchPreviewUrl(url);
@@ -3435,7 +3453,8 @@ async function previewBlob(url, fileName, downloadFn) {
         + encodeURIComponent(signed) + '" style="width:100%;height:80vh;border:none"></iframe>';
 
     } else if (['txt','log','md','json','csv'].indexOf(ext) !== -1) {
-      var t = await (await fetchAuthBlob(url)).text();
+      var signed = await fetchPreviewUrl(url);
+      var t = await (await fetch(signed)).text();
       box.innerHTML = '<div class="pv-pre">' + esc(t.slice(0, 200000)) + '</div>';
 
     } else {
@@ -3456,7 +3475,7 @@ function closeFilePreview() {
 
 function downloadFile(fileId) {
   var f = files.find(function(x) { return x.id === fileId; });
-  authDownload('/api/team-files/' + fileId + '/download', f ? (f.originalFileName || f.fileName) : 'download');
+  signedDownload('/api/team-files/' + fileId + '/download', f ? (f.originalFileName || f.fileName) : 'download');
 }
 
 async function deleteFile(fileId) {
@@ -3602,7 +3621,7 @@ async function uploadManual() {
 
 function downloadManual(manualId) {
   var m = manuals.find(function(x) { return x.id === manualId; });
-  authDownload('/api/manuals/' + manualId + '/download', m ? (m.fileName || m.title) : 'download');
+  signedDownload('/api/manuals/' + manualId + '/download', m ? (m.fileName || m.title) : 'download');
 }
 
 function previewManual(manualId) {
