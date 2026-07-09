@@ -1673,6 +1673,9 @@ async function saveEdit(){
     act_ko:isKoA?actVal:'',
     photos:editPhotos.slice(),
   };
+  // 한국어 내용은 저장 시점에 영어 번역을 함께 저장
+  if(isKoS)payload.status_en=await tryTranslate(statusVal);
+  if(isKoA)payload.act_en=await tryTranslate(actVal);
   var res=await apiPut('/api/entries/'+encodeURIComponent(editId), payload);
   if(!res||!res.success){toast('Failed to save changes.',1);return;}
   Object.keys(payload).forEach(function(k){e[k]=payload[k];});
@@ -2032,6 +2035,9 @@ async function submitEntry() {
 
   if (submitEntry._busy) return;
   submitEntry._busy = true;
+  // 한국어 내용은 저장 시점에 영어 번역을 함께 저장 (EN 모드에서 즉시 표시)
+  if (isKoS) entry.status_en = await tryTranslate(statusVal);
+  if (isKoA) entry.act_en = await tryTranslate(actVal);
   var _sb = document.getElementById('sub-btn');
   if (_sb) { _sb.disabled = true; _sb.style.opacity = '.6'; }
   try {
@@ -2820,6 +2826,15 @@ function isKorean(t) {
 }
 function isEnglish(t) {
   return t && !isKorean(t);
+}
+
+// \uc800\uc7a5 \uc2dc\uc810 \ubc88\uc5ed: \uc2e4\ud328/\ud0c0\uc784\uc544\uc6c3/\ubb34\ubcc0\ud654\uba74 '' \ubc18\ud658 (\ub80c\ub354 \uc2dc \uc2e4\uc2dc\uac04 \ubc88\uc5ed\uc73c\ub85c \ud3f4\ubc31)
+function tryTranslate(text, ms) {
+  return Promise.race([
+    translateText(text, 'ko', 'en'),
+    new Promise(function(res) { setTimeout(function() { res(text); }, ms || 3000); })
+  ]).then(function(r) { return (r && r !== text) ? r : ''; })
+    .catch(function() { return ''; });
 }
 
 // Translate all visible log rows
@@ -3825,8 +3840,10 @@ function pendingRow(p, isHist) {
   if (isAdminUser()) h += '<button class="btn btn-xs btn-d" onclick="deletePending(\'' + p.id + '\')">삭제</button>';
   h += '</div></div>';
 
-  // ── 내용 ──
-  h += '<div class="prow-desc" data-tr onclick="togglePendingRow(\'' + p.id + '\')">' + esc(p.description) + '</div>';
+  // ── 내용 (EN 모드면 저장된 번역 우선, 없으면 data-tr 실시간 번역 폴백) ──
+  var useDescEn = transLang === 'en' && p.description_en;
+  h += '<div class="prow-desc"' + (useDescEn ? '' : ' data-tr') + ' onclick="togglePendingRow(\'' + p.id + '\')">'
+    + esc(useDescEn ? p.description_en : p.description) + '</div>';
 
   // ── 메타 ──
   var due = p.dueDate
@@ -3843,7 +3860,11 @@ function pendingRow(p, isHist) {
 
   // ── 펼침: 조치/진행사항 + 첨부 ──
   if (open) {
-    if (p.details) h += '<div class="prow-detail" data-tr><b>조치 / 진행사항</b>\n' + esc(p.details) + '</div>';
+    if (p.details) {
+      var useDetEn = transLang === 'en' && p.details_en;
+      h += '<div class="prow-detail"' + (useDetEn ? '' : ' data-tr') + '><b>조치 / 진행사항</b>\n'
+        + esc(useDetEn ? p.details_en : p.details) + '</div>';
+    }
     if ((p.attachments || []).length) {
       h += '<div class="prow-atts">' + p.attachments.map(function(a, i) {
         return '<span class="patt" onclick="event.stopPropagation();openPendingFile(\'' + p.id + '\',' + i + ')" title="' + escAttr(a.name) + '">'
@@ -4087,7 +4108,8 @@ async function savePendingIssue() {
     }
     prog.textContent = '저장 중...';
 
-    // 2) 이슈 저장
+    // 2) 이슈 저장 (한국어 내용은 영어 번역을 함께 저장 — EN 모드에서 즉시 표시)
+    var details = document.getElementById('pi-details').value.trim();
     var payload = {
       issueDate: document.getElementById('pi-date').value,
       category: document.getElementById('pi-cat').value,
@@ -4098,7 +4120,9 @@ async function savePendingIssue() {
       dueDate: document.getElementById('pi-due').value,
       status: document.getElementById('pi-status').value,
       description: desc,
-      details: document.getElementById('pi-details').value.trim(),
+      description_en: isKorean(desc) ? await tryTranslate(desc) : desc,
+      details: details,
+      details_en: (details && isKorean(details)) ? await tryTranslate(details) : details,
       attachments: atts
     };
     var token = localStorage.getItem('ws_token') || '';
@@ -4350,6 +4374,11 @@ new MutationObserver(function(muts) {
 var _origSetLang = setLang;
 setLang = function(l) {
   _origSetLang(l);
+  // Tasks 탭 목록들도 다시 그려 저장된 번역(_en 필드)이 바로 반영되게 함
+  try { renderTasks(); } catch(e) {}
+  try { renderPending(); } catch(e) {}
+  try { renderFiles(); } catch(e) {}
+  try { renderManuals(); } catch(e) {}
   if (l === 'en') {
     translateSubtree(document.body);
     queueDataTranslate(document.body);

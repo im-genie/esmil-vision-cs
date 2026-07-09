@@ -665,7 +665,9 @@ async def create_pending_issue(payload: dict, u: str = Depends(current_user)):
         "polarity": str(payload.get("polarity") or "공통"),
         "vision": str(payload.get("vision") or ""),
         "description": str(payload.get("description") or ""),
+        "description_en": str(payload.get("description_en") or ""),
         "details": str(payload.get("details") or ""),
+        "details_en": str(payload.get("details_en") or ""),
         "assignee": str(payload.get("assignee") or ""),
         "dueDate": str(payload.get("dueDate") or ""),
         "status": status,
@@ -693,7 +695,7 @@ async def update_pending_issue(issue_id: str, payload: dict, u: str = Depends(cu
     prev = doc.to_dict() or {}
 
     allowed = {"issueDate", "category", "process", "polarity", "vision", "description",
-               "details", "assignee", "dueDate", "status", "attachments"}
+               "description_en", "details", "details_en", "assignee", "dueDate", "status", "attachments"}
     data = {k: v for k, v in payload.items() if k in allowed}
     if "status" in data:
         data["status"] = str(data["status"]).lower()
