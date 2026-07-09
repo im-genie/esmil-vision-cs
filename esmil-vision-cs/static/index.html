@@ -982,10 +982,10 @@ function showPage(name,btn){
       <div class="pbar" style="height:5px"><div class="pfil" id="pending-bar" style="width:0%;background:var(--gn)"></div></div>
     </div>
     <div class="pfilter">
-      <select id="pf-proc" onchange="renderPending()">
+      <select id="pf-proc" onchange="onPendingFilterChange()">
         <option value="">공정 전체</option><option>COT</option><option>RP</option><option value="공통">공통</option>
       </select>
-      <select id="pf-pol" onchange="renderPending()">
+      <select id="pf-pol" onchange="onPendingFilterChange()">
         <option value="">A/C 전체</option><option value="C">Cathode</option><option value="A">Anode</option><option value="공통">공통</option>
       </select>
       <select id="pf-vis" onchange="renderPending()"><option value="">Vision 전체</option></select>
@@ -3834,15 +3834,34 @@ async function loadPending() {
   }
 }
 
+// Vision 필터: 공정 × A/C 필터 선택에 따라 표준 검사기 목록을 보여주고,
+// 표준 목록에 없는 기존 데이터 값들은 '기존 값' 그룹으로 분리해 유지한다
 function buildPendingVisionFilter() {
   var sel = document.getElementById('pf-vis');
   if (!sel) return;
   var cur = sel.value;
+  var proc = document.getElementById('pf-proc').value || '공통';  // 전체 → 합집합
+  var pol = document.getElementById('pf-pol').value || '공통';
+  var std = pendingVisionOptions(proc, pol);
   var seen = {};
-  pendingIssues.forEach(function(p) { if (p.vision) seen[p.vision] = 1; });
-  sel.innerHTML = '<option value="">Vision 전체</option>' + Object.keys(seen).sort().map(function(v) {
-    return '<option' + (v === cur ? ' selected' : '') + '>' + esc(v) + '</option>';
-  }).join('');
+  std.forEach(function(v) { seen[v] = 1; });
+  var legacy = [];
+  pendingIssues.forEach(function(p) {
+    if (p.vision && !seen[p.vision]) { seen[p.vision] = 1; legacy.push(p.vision); }
+  });
+  legacy.sort();
+  function opt(v) { return '<option value="' + escAttr(v) + '">' + esc(v) + '</option>'; }
+  var html = '<option value="">Vision 전체</option>' + std.map(opt).join('');
+  if (legacy.length) html += '<optgroup label="기존 값">' + legacy.map(opt).join('') + '</optgroup>';
+  sel.innerHTML = html;
+  sel.value = cur;
+  if (sel.value !== cur) sel.value = '';
+}
+
+// 공정/A-C 필터가 바뀌면 Vision 선택지도 그 조합에 맞게 갱신
+function onPendingFilterChange() {
+  buildPendingVisionFilter();
+  renderPending();
 }
 
 // 발행 후 경과일 (오늘 - issueDate)
@@ -4297,7 +4316,7 @@ var UI_DICT = {
   '완료된 이슈가 없습니다': 'No completed issues',
   '필터에 맞는 이슈가 없습니다': 'No issues match the filters',
   '공정 전체': 'All Processes', 'A/C 전체': 'All A/C', 'Vision 전체': 'All Visions',
-  '상태 전체': 'All Status', '공통': 'Common',
+  '상태 전체': 'All Status', '공통': 'Common', '기존 값': 'Legacy values',
   '검색 (내용·담당자·No...)': 'Search (content · PIC · No...)',
   '발행 후 경과일': 'Days since issued', '기한 초과': 'Overdue',
   '조치 / 진행사항': 'Action / Progress', '첨부파일': 'Attachments', '첨부 없음': 'No attachments',
@@ -4381,12 +4400,12 @@ function translateSubtree(root) {
   });
   var t;
   while ((t = walker.nextNode())) translateUiTextNode(t);
-  // placeholder/title 속성
+  // placeholder/title/label(optgroup) 속성
   var els = [];
-  if (root.matches && root.matches('[placeholder],[title]')) els.push(root);
-  if (root.querySelectorAll) els = els.concat(Array.prototype.slice.call(root.querySelectorAll('[placeholder],[title]')));
+  if (root.matches && root.matches('[placeholder],[title],optgroup[label]')) els.push(root);
+  if (root.querySelectorAll) els = els.concat(Array.prototype.slice.call(root.querySelectorAll('[placeholder],[title],optgroup[label]')));
   els.forEach(function(el) {
-    ['placeholder', 'title'].forEach(function(a) {
+    ['placeholder', 'title', 'label'].forEach(function(a) {
       var v = el.getAttribute(a);
       if (!v || !/[가-힣]/.test(v)) return;
       var en = lookupUi(v.trim());
